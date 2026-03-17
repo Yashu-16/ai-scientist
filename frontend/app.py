@@ -17,7 +17,7 @@ st.set_page_config(
 )
 
 # ── Backend URL ──────────────────────────────────────────────
-API_BASE_URL = "http://localhost:8000"
+API_BASE_URL = "https://ai-scientist-api.onrender.com"
 
 # ── Custom CSS ───────────────────────────────────────────────
 st.markdown("""
