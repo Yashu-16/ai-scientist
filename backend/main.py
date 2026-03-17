@@ -101,6 +101,26 @@ def get_example_diseases():
         ]
     }
 
+@app.get("/cache/stats", tags=["Utility"])
+def cache_stats():
+    """Returns current cache statistics."""
+    from backend.services.pipeline_service import pipeline_cache
+    return {
+        "cache": pipeline_cache.stats(),
+        "message": "Results are cached for 60 minutes"
+    }
+
+
+@app.delete("/cache/clear", tags=["Utility"])
+def clear_cache():
+    """Clears all cached pipeline results."""
+    from backend.services.pipeline_service import pipeline_cache
+    count = pipeline_cache.clear()
+    return {
+        "cleared": count,
+        "message": f"Cleared {count} cached entries"
+    }
+
 
 @app.post("/analyze-disease", response_model=AnalysisResponse, tags=["Analysis"])
 def analyze_disease(request: AnalysisRequest):
