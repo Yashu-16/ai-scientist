@@ -191,6 +191,144 @@ def fetch_papers_stage(disease_name: str, top_protein: str, max_papers: int) -> 
     print(f"  [Thread] ✅ Papers done: {len(result.get('papers', []))} found")
     return result
 
+def compute_decision_summary(
+    result: DiseaseAnalysisResult
+) -> "DecisionSummary":
+    """
+    Extract the best actionable recommendation from ranked hypotheses.
+
+    Logic:
+    1. Take the highest final_score hypothesis (rank 1)
+    2. Extract drug, protein, pathway from it
+    3. Get risk level from drug data
+    4. Generate reasoning summary
+    5. Suggest next action based on clinical phase + risk
+    """
+    from backend.models.schemas import DecisionSummary
+
+    # Need at least one hypothesis
+    if not result.hypotheses:
+        return DecisionSummary(
+            best_hypothesis   = "Insufficient data",
+            reasoning_summary = "Not enough evidence to generate a recommendation.",
+            suggested_action  = "Try a different disease name or expand search parameters."
+        )
+
+    # Best hypothesis = rank 1 (already sorted by pipeline)
+    best = min(result.hypotheses, key=lambda h: h.rank)
+
+    # Extract drug info
+    recommended_drug = best.key_drugs[0] if best.key_drugs else "Unknown"
+    target_protein   = best.key_proteins[0] if best.key_proteins else "Unknown"
+
+    # Get risk level for the recommended drug
+    risk_level = "Unknown"
+    risk_color = "#64748b"
+    drug_phase = None
+
+    for drug in result.drugs:
+        if drug.drug_name.upper() == recommended_drug.upper():
+            risk_level = drug.risk_level
+            drug_phase = drug.clinical_phase
+            risk_color = {
+                "High":    "#ef4444",
+                "Medium":  "#f59e0b",
+                "Low":     "#22c55e",
+                "Unknown": "#64748b"
+            }.get(risk_level, "#64748b")
+            break
+
+    # Extract pathway from hypothesis title or explanation
+    pathway_keywords = [
+        "amyloidogenic pathway", "NMDA receptor excitotoxicity",
+        "APOE lipid transport", "Notch signaling",
+        "mTOR/autophagy", "neuroinflammation",
+        "gamma-secretase", "dopaminergic pathway",
+        "PI3K/AKT", "MAPK signaling", "p53 pathway"
+    ]
+    target_pathway = "unknown pathway"
+    title_lower    = best.title.lower()
+    expl_lower     = best.explanation.lower()
+
+    for kw in pathway_keywords:
+        if kw.lower() in title_lower or kw.lower() in expl_lower:
+            target_pathway = kw
+            break
+
+    # Build reasoning summary
+    phase_str = f"Phase {drug_phase}" if drug_phase else "clinical"
+    reasoning = (
+        f"{recommended_drug} ({phase_str}) targeting {target_protein} "
+        f"via the {target_pathway} shows the strongest evidence profile "
+        f"with a composite score of {best.final_score:.0%}. "
+        f"{best.evidence_summary or best.explanation[:150]}"
+    )
+
+    # Suggest next action based on phase + risk
+    if drug_phase == 4:
+        if risk_level == "High":
+            action = (
+                f"⚠️ {recommended_drug} is FDA-approved (Phase 4) but carries "
+                f"high adverse event signals. Recommend benefit-risk analysis "
+                f"before pursuing further. Consider monitoring protocols."
+            )
+        elif risk_level == "Medium":
+            action = (
+                f"✅ {recommended_drug} is FDA-approved (Phase 4) with manageable "
+                f"risk profile. Recommend literature review of combination therapy "
+                f"approaches targeting {target_protein}."
+            )
+        else:
+            action = (
+                f"🟢 {recommended_drug} (Phase 4, low risk) is a strong candidate. "
+                f"Recommend in-vitro validation of {target_protein} interaction "
+                f"and review of existing clinical outcomes data."
+            )
+    elif drug_phase == 3:
+        action = (
+            f"🔬 {recommended_drug} is in Phase 3 trials. "
+            f"Recommend reviewing trial results and designing complementary "
+            f"in-vitro assays targeting {target_protein} to support or "
+            f"differentiate from existing trial hypotheses."
+        )
+    elif drug_phase == 2:
+        action = (
+            f"🧪 {recommended_drug} is in Phase 2. "
+            f"Recommend in-vitro validation studies targeting {target_protein} "
+            f"and analysis of Phase 2 trial inclusion criteria."
+        )
+    else:
+        action = (
+            f"🔭 Early-stage opportunity. Recommend in-vitro assay design "
+            f"targeting {target_protein} in {target_pathway} "
+            f"and patent landscape analysis for {recommended_drug}."
+        )
+
+    # Evidence basis
+    paper_count   = len(result.papers)
+    ev            = result.evidence_strength
+    ev_label      = ev.evidence_label if ev else "Unknown"
+    evidence_basis= (
+        f"{paper_count} research papers retrieved | "
+        f"Evidence strength: {ev_label} | "
+        f"Protein association score: {best.protein_score:.2f} | "
+        f"Drug clinical phase score: {best.drug_score:.2f}"
+    )
+
+    return DecisionSummary(
+        best_hypothesis  = best.title,
+        recommended_drug = recommended_drug,
+        target_protein   = target_protein,
+        target_pathway   = target_pathway,
+        confidence_score = best.final_score,
+        confidence_label = best.confidence_label,
+        risk_level       = risk_level,
+        risk_color       = risk_color,
+        reasoning_summary= reasoning,
+        suggested_action = action,
+        evidence_basis   = evidence_basis
+    )
+
 
 def run_data_pipeline(
     disease_name: str,

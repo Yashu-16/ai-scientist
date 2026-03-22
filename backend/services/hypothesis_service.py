@@ -6,6 +6,7 @@ import json
 from dotenv import load_dotenv
 from backend.models.schemas import Hypothesis, DiseaseAnalysisResult
 from backend.services.pipeline_service import build_llm_context
+from backend.services.paper_service import extract_causal_evidence
 
 load_dotenv()
 
@@ -427,6 +428,443 @@ def parse_hypothesis_response(raw_json: str, disease_name: str) -> list[Hypothes
         print(f"   ❌ JSON parse error: {e}")
         return get_mock_hypotheses(disease_name)
 
+def add_causal_analysis(
+    hypotheses:      list,
+    pipeline_result: DiseaseAnalysisResult
+) -> list:
+    """
+    Add causal analysis to each hypothesis by scanning
+    supporting papers for causal language related to
+    each hypothesis's proteins and drugs.
+    """
+    from backend.models.schemas import CausalAnalysis, CausalEvidence
+
+    print("\n🔬 Running causal reasoning analysis...")
+
+    # Convert papers to dicts for the extractor
+    papers = [
+        p.model_dump() if hasattr(p, "model_dump") else p
+        for p in pipeline_result.papers
+    ]
+
+    for hyp in hypotheses:
+        causal_data = extract_causal_evidence(
+            papers       = papers,
+            gene_symbols = hyp.key_proteins,
+            drug_names   = hyp.key_drugs
+        )
+
+        # Convert evidence dicts to CausalEvidence objects
+        evidence_objects = [
+            CausalEvidence(
+                text        = e.get("text",""),
+                causal_verb = e.get("causal_verb",""),
+                source      = e.get("source",""),
+                strength    = e.get("strength","")
+            )
+            for e in causal_data.get("causal_evidence", [])
+        ]
+
+        hyp.causal_analysis = CausalAnalysis(
+            causal_score         = causal_data["causal_score"],
+            causal_label         = causal_data["causal_label"],
+            causal_color         = causal_data["causal_color"],
+            causal_evidence      = evidence_objects,
+            causal_verbs_found   = causal_data["causal_verbs_found"],
+            correlation_note     = causal_data["correlation_note"],
+            causal_chain         = causal_data["causal_chain"],
+            total_causal_hits    = causal_data["total_causal_hits"],
+            total_papers_scanned = causal_data["total_papers_scanned"]
+        )
+
+        label = hyp.causal_analysis.causal_label
+        score = hyp.causal_analysis.causal_score
+        print(f"   • {hyp.title[:50]}...")
+        print(f"     Causal: {label} (score: {score:.2f}) | "
+              f"hits: {causal_data['total_causal_hits']} | "
+              f"verbs: {causal_data['causal_verbs_found'][:3]}")
+
+    return hypotheses
+
+def generate_validation_suggestions(
+    hypotheses:      list,
+    pipeline_result: DiseaseAnalysisResult
+) -> list:
+    """
+    Feature 4: Add experimental validation suggestions to each hypothesis.
+
+    Uses a focused LLM prompt to suggest:
+    - In-vitro assay (cell culture experiments)
+    - In-vivo model (animal studies)
+    - Clinical approach (human trials/biomarkers)
+
+    Runs as a single batched LLM call for efficiency.
+    """
+    from backend.models.schemas import ValidationSuggestion
+
+    if LLM_PROVIDER == "mock" or client is None:
+        # Add mock validation suggestions
+        for hyp in hypotheses:
+            hyp.validation_suggestion = _mock_validation(hyp)
+        return hypotheses
+
+    print("\n🧪 Generating experimental validation suggestions...")
+
+    # Build batched prompt for all hypotheses at once
+    hyp_list = "\n\n".join([
+        f"Hypothesis {i+1}:\n"
+        f"Title: {hyp.title}\n"
+        f"Protein: {', '.join(hyp.key_proteins)}\n"
+        f"Drug: {', '.join(hyp.key_drugs)}\n"
+        f"Explanation: {hyp.explanation[:200]}"
+        for i, hyp in enumerate(hypotheses)
+    ])
+
+    prompt = f"""
+You are an experimental biologist and drug discovery scientist.
+
+For each hypothesis below, suggest ONE specific experimental validation method.
+
+DISEASE CONTEXT: {pipeline_result.disease_name}
+
+HYPOTHESES:
+{hyp_list}
+
+For each hypothesis, choose the MOST appropriate validation type:
+- "In-vitro": Cell culture, protein assays, biochemical experiments
+- "In-vivo": Animal models (mouse, rat, zebrafish)
+- "Clinical": Biomarker analysis, patient data, clinical trials
+
+Return ONLY a JSON array with exactly {len(hypotheses)} objects:
+[
+  {{
+    "hypothesis_index": 0,
+    "validation_type": "In-vitro",
+    "experiment_title": "Short name of the experiment (max 8 words)",
+    "experiment_description": "2-3 sentences describing exact protocol, cell line or model, measurement method, and what you are testing.",
+    "required_tools": ["tool1", "tool2", "tool3"],
+    "expected_outcome": "One sentence: what does a positive result look like?",
+    "estimated_timeline": "X-Y months",
+    "difficulty": "Low"
+  }}
+]
+
+VALIDATION TYPE GUIDELINES:
+- Phase 4 drugs → Clinical (already proven, test biomarkers)
+- Phase 2-3 drugs → In-vivo (needs animal validation)
+- Phase 1 or unknown → In-vitro (start with cell models)
+- Proteins with known cell lines → In-vitro
+- Neurodegeneration targets → In-vivo (mouse models preferred)
+
+DIFFICULTY GUIDELINES:
+- Low: Standard assays, common cell lines, 1-3 months
+- Medium: Specialized models, complex protocols, 3-6 months
+- High: Transgenic animals, clinical samples, 6+ months
+
+Return ONLY valid JSON array. No markdown, no text outside JSON.
+"""
+
+    try:
+        response = client.chat.completions.create(
+            model       = LLM_MODEL,
+            messages    = [
+                {"role": "system", "content":
+                 "You are an expert experimental biologist. "
+                 "Always return valid JSON only."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature = 0.3,
+            max_tokens  = 1500,
+        )
+
+        raw = response.choices[0].message.content.strip()
+        print(f"   ✅ Validation LLM responded ({len(raw)} chars)")
+
+        # Clean JSON
+        if raw.startswith("```"):
+            lines = raw.split("\n")
+            raw   = "\n".join(lines[1:-1])
+
+        suggestions = json.loads(raw)
+
+        for item in suggestions:
+            idx = item.get("hypothesis_index", 0)
+            if idx < len(hypotheses):
+                v_type  = item.get("validation_type", "In-vitro")
+                v_color = {
+                    "In-vitro": "#3b82f6",
+                    "In-vivo":  "#8b5cf6",
+                    "Clinical": "#f59e0b"
+                }.get(v_type, "#64748b")
+
+                diff       = item.get("difficulty", "Medium")
+                diff_color = {
+                    "Low":    "#22c55e",
+                    "Medium": "#f59e0b",
+                    "High":   "#ef4444"
+                }.get(diff, "#64748b")
+
+                hypotheses[idx].validation_suggestion = ValidationSuggestion(
+                    validation_type        = v_type,
+                    validation_color       = v_color,
+                    experiment_title       = item.get("experiment_title", ""),
+                    experiment_description = item.get("experiment_description", ""),
+                    required_tools         = item.get("required_tools", []),
+                    expected_outcome       = item.get("expected_outcome", ""),
+                    estimated_timeline     = item.get("estimated_timeline", ""),
+                    difficulty             = diff,
+                    difficulty_color       = diff_color
+                )
+
+                hyp = hypotheses[idx]
+                print(f"   • {hyp.title[:45]}...")
+                print(f"     → {v_type} | {diff} difficulty | "
+                      f"{item.get('estimated_timeline','?')}")
+
+    except Exception as e:
+        print(f"   ⚠️  Validation generation error: {e}")
+        print("   ℹ️  Using mock validation suggestions")
+        for hyp in hypotheses:
+            if not hyp.validation_suggestion:
+                hyp.validation_suggestion = _mock_validation(hyp)
+
+    return hypotheses
+
+
+def _mock_validation(hyp) -> "ValidationSuggestion":
+    """Fallback mock validation suggestion."""
+    from backend.models.schemas import ValidationSuggestion
+
+    proteins = hyp.key_proteins
+    drugs    = hyp.key_drugs
+    drug     = drugs[0] if drugs else "the compound"
+    protein  = proteins[0] if proteins else "the target protein"
+
+    # Pick type based on drug name patterns
+    drug_upper = drug.upper()
+    if any(x in drug_upper for x in ["MAB","UMAB","ZUMAB","NUMAB"]):
+        v_type = "Clinical"
+        v_color= "#f59e0b"
+    elif any(x in drug_upper for x in ["STAT","STAT","CEMAB"]):
+        v_type = "In-vivo"
+        v_color= "#8b5cf6"
+    else:
+        v_type = "In-vitro"
+        v_color= "#3b82f6"
+
+    return ValidationSuggestion(
+        validation_type        = v_type,
+        validation_color       = v_color,
+        experiment_title       = f"{protein} activity assay with {drug}",
+        experiment_description = (
+            f"Treat {protein}-expressing cell lines with increasing "
+            f"concentrations of {drug}. Measure protein activity, "
+            f"downstream pathway markers, and cell viability using "
+            f"standard biochemical assays."
+        ),
+        required_tools         = [
+            "Cell culture facility",
+            "Western blot apparatus",
+            "ELISA kit",
+            "Flow cytometer"
+        ],
+        expected_outcome       = (
+            f"Dose-dependent reduction in {protein} activity "
+            f"with corresponding decrease in disease-relevant biomarkers."
+        ),
+        estimated_timeline     = "3-6 months",
+        difficulty             = "Medium",
+        difficulty_color       = "#f59e0b"
+    )
+
+def generate_hypothesis_critiques(
+    hypotheses:      list,
+    pipeline_result: DiseaseAnalysisResult
+) -> list:
+    """
+    Feature 5: Critically evaluate each hypothesis.
+
+    Uses a second LLM pass to identify:
+    - Scientific weaknesses
+    - Contradictory evidence
+    - Clinical/safety risks
+    - How to strengthen the hypothesis
+
+    Runs as a single batched LLM call for efficiency.
+    """
+    from backend.models.schemas import HypothesisCritique
+
+    if LLM_PROVIDER == "mock" or client is None:
+        for hyp in hypotheses:
+            hyp.critique = _mock_critique(hyp)
+        return hypotheses
+
+    print("\n🔍 Generating hypothesis critiques...")
+
+    hyp_list = "\n\n".join([
+        f"Hypothesis {i+1}:\n"
+        f"Title: {hyp.title}\n"
+        f"Protein: {', '.join(hyp.key_proteins)}\n"
+        f"Drug: {', '.join(hyp.key_drugs)}\n"
+        f"Confidence: {hyp.confidence_score}\n"
+        f"Explanation: {hyp.explanation[:250]}"
+        for i, hyp in enumerate(hypotheses)
+    ])
+
+    prompt = f"""
+You are a senior peer reviewer and critical biomedical scientist.
+
+Critically evaluate each hypothesis below for {pipeline_result.disease_name}.
+Be scientifically rigorous and honest about limitations.
+
+HYPOTHESES TO CRITIQUE:
+{hyp_list}
+
+AVAILABLE EVIDENCE CONTEXT:
+- Proteins: {', '.join([p.gene_symbol for p in pipeline_result.protein_targets[:5]])}
+- Drugs in pipeline: {', '.join([d.drug_name for d in pipeline_result.drugs[:5]])}
+- Papers available: {len(pipeline_result.papers)}
+
+For each hypothesis, provide a critical evaluation.
+
+Return ONLY a JSON array with exactly {len(hypotheses)} objects:
+[
+  {{
+    "hypothesis_index": 0,
+    "overall_assessment": "One sentence verdict on the hypothesis strength",
+    "weaknesses": [
+      "Specific weakness 1 (be concrete, not generic)",
+      "Specific weakness 2",
+      "Specific weakness 3"
+    ],
+    "contradictory_evidence": [
+      "Known fact or study that contradicts or complicates this hypothesis",
+      "Second contradiction if applicable"
+    ],
+    "risks": [
+      "Specific clinical or scientific risk",
+      "Second risk if applicable"
+    ],
+    "confidence_impact": "One sentence: how do these critiques affect overall confidence?",
+    "salvage_suggestion": "One concrete suggestion to strengthen or validate this hypothesis",
+    "critique_severity": "Minor"
+  }}
+]
+
+SEVERITY GUIDELINES:
+- "Minor": Small gaps, hypothesis still strong, easy to address
+- "Moderate": Real limitations, needs additional validation, confidence reduced
+- "Major": Significant contradictions or safety concerns, high-risk hypothesis
+
+IMPORTANT RULES:
+- Be specific, not generic (avoid "more research is needed")
+- Reference actual biology (mention specific pathways, proteins, mechanisms)
+- For Phase 4 drugs, focus on known clinical failures or safety signals
+- Keep weaknesses to 2-3 most important ones
+- Return ONLY valid JSON. No markdown.
+"""
+
+    try:
+        response = client.chat.completions.create(
+            model       = LLM_MODEL,
+            messages    = [
+                {"role": "system", "content":
+                 "You are a rigorous peer reviewer. "
+                 "Return only valid JSON."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature = 0.3,
+            max_tokens  = 2000,
+        )
+
+        raw = response.choices[0].message.content.strip()
+        print(f"   ✅ Critique LLM responded ({len(raw)} chars)")
+
+        if raw.startswith("```"):
+            lines = raw.split("\n")
+            raw   = "\n".join(lines[1:-1])
+
+        critiques = json.loads(raw)
+
+        severity_colors = {
+            "Minor":    "#22c55e",
+            "Moderate": "#f59e0b",
+            "Major":    "#ef4444"
+        }
+
+        for item in critiques:
+            idx = item.get("hypothesis_index", 0)
+            if idx < len(hypotheses):
+                severity = item.get("critique_severity", "Moderate")
+                hypotheses[idx].critique = HypothesisCritique(
+                    overall_assessment      = item.get("overall_assessment",""),
+                    weaknesses              = item.get("weaknesses",[]),
+                    contradictory_evidence  = item.get("contradictory_evidence",[]),
+                    risks                   = item.get("risks",[]),
+                    confidence_impact       = item.get("confidence_impact",""),
+                    salvage_suggestion      = item.get("salvage_suggestion",""),
+                    critique_severity       = severity,
+                    severity_color          = severity_colors.get(severity,"#f59e0b")
+                )
+                print(f"   • {hypotheses[idx].title[:45]}...")
+                print(f"     Severity: {severity} | "
+                      f"Weaknesses: {len(item.get('weaknesses',[]))} | "
+                      f"Risks: {len(item.get('risks',[]))}")
+
+    except Exception as e:
+        print(f"   ⚠️  Critique generation error: {e}")
+        for hyp in hypotheses:
+            if not hyp.critique:
+                hyp.critique = _mock_critique(hyp)
+
+    return hypotheses
+
+
+def _mock_critique(hyp) -> "HypothesisCritique":
+    """Fallback mock critique."""
+    from backend.models.schemas import HypothesisCritique
+
+    protein = hyp.key_proteins[0] if hyp.key_proteins else "the target"
+    drug    = hyp.key_drugs[0] if hyp.key_drugs else "the compound"
+
+    return HypothesisCritique(
+        overall_assessment     = (
+            f"Hypothesis is plausible but requires additional validation "
+            f"to establish direct causality."
+        ),
+        weaknesses             = [
+            f"Limited direct evidence linking {drug} specifically to "
+            f"{protein} modulation in disease context.",
+            f"Association score from OpenTargets reflects correlation, "
+            f"not confirmed mechanistic causality.",
+            "Available paper evidence is insufficient to rule out "
+            "off-target effects."
+        ],
+        contradictory_evidence = [
+            f"Some clinical trials targeting similar pathways have shown "
+            f"limited cognitive benefit despite reducing biomarkers.",
+            "Blood-brain barrier penetration of compound not confirmed "
+            "in all patient populations."
+        ],
+        risks                  = [
+            f"FDA adverse event signals suggest monitoring required "
+            f"for {drug}.",
+            "Pathway redundancy may reduce therapeutic impact if "
+            "compensatory mechanisms activate."
+        ],
+        confidence_impact      = (
+            "These limitations reduce certainty from High to Medium-High. "
+            "Hypothesis remains viable but needs experimental confirmation."
+        ),
+        salvage_suggestion     = (
+            f"Design an in-vitro assay specifically measuring {protein} "
+            f"activity changes after {drug} treatment in disease-relevant "
+            f"cell models to establish direct mechanistic link."
+        ),
+        critique_severity  = "Moderate",
+        severity_color     = "#f59e0b"
+    )
+
 
 # ── 6. Main Generation Function ───────────────────────────────
 
@@ -471,40 +909,19 @@ def generate_hypotheses(
         print("   ℹ️  Falling back to mock hypotheses")
         hypotheses = get_mock_hypotheses(pipeline_result.disease_name)
 
-    return rank_hypotheses(hypotheses, pipeline_result)
+    # ── Stage 1: Rank ─────────────────────────────────────────
+    ranked = rank_hypotheses(hypotheses, pipeline_result)
 
+    # ── Stage 2: Causal analysis ──────────────────────────────
+    ranked = add_causal_analysis(ranked, pipeline_result)
 
-def generate_evidence_explanation(
-    hypothesis:   Hypothesis,
-    detail_level: str = "scientist"
-) -> str:
-    """Generate expanded explanation for a single hypothesis."""
-    if client is None:
-        return hypothesis.explanation
+    # ── Stage 3: Experimental validation ─────────────────────
+    ranked = generate_validation_suggestions(ranked, pipeline_result)
 
-    prompt = (
-        f"Explain simply with analogy in 3-4 sentences.\n"
-        f"Hypothesis: {hypothesis.title}\nContext: {hypothesis.explanation[:300]}"
-        if detail_level == "simple"
-        else
-        f"Expand with molecular pathway, validation approach, therapeutic implications, "
-        f"limitations. 4-5 sentences.\n"
-        f"Hypothesis: {hypothesis.title}\nContext: {hypothesis.explanation[:300]}"
-    )
+    # ── Stage 4: Critical evaluation ─────────────────────────
+    ranked = generate_hypothesis_critiques(ranked, pipeline_result)
 
-    try:
-        response = client.chat.completions.create(
-            model       = LLM_MODEL,
-            messages    = [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user",   "content": prompt}
-            ],
-            temperature = 0.3,
-            max_tokens  = 400,
-        )
-        return response.choices[0].message.content.strip()
-    except Exception as e:
-        return f"Explanation unavailable: {str(e)}"
+    return ranked
 
 
 # ── Quick test ────────────────────────────────────────────────

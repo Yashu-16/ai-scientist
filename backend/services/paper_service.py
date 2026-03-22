@@ -224,6 +224,168 @@ def fetch_papers_for_disease(disease_name: str, protein_symbol: str = "", max_re
         "papers": unique_papers
     }
 
+# ── Causal Keyword Extraction ─────────────────────────────────
+
+# Causal verbs ranked by strength
+CAUSAL_VERBS = {
+    "strong": [
+        "inhibits", "activates", "induces", "causes", "prevents",
+        "blocks", "triggers", "suppresses", "promotes", "abolishes",
+        "eliminates", "restores", "rescues", "disrupts", "drives"
+    ],
+    "moderate": [
+        "reduces", "increases", "enhances", "decreases", "modulates",
+        "regulates", "controls", "mediates", "facilitates", "impairs",
+        "stimulates", "attenuates", "upregulates", "downregulates"
+    ],
+    "weak": [
+        "leads to", "results in", "contributes to", "associated with",
+        "linked to", "involved in", "affects", "influences", "impacts",
+        "correlates with", "related to"
+    ]
+}
+
+# Flatten for quick lookup
+ALL_CAUSAL_VERBS = {
+    verb: strength
+    for strength, verbs in CAUSAL_VERBS.items()
+    for verb in verbs
+}
+
+
+def extract_causal_evidence(
+    papers: list,
+    gene_symbols: list = None,
+    drug_names: list   = None
+) -> dict:
+    """
+    Scan paper abstracts and summaries for causal language.
+
+    Args:
+        papers      : List of paper dicts or ResearchPaper objects
+        gene_symbols: Protein names to look for (e.g. ["PSEN1", "APP"])
+        drug_names  : Drug names to look for (e.g. ["NIROGACESTAT"])
+
+    Returns:
+        Dict with causal_score, label, evidence list, causal chain
+    """
+    gene_symbols = [g.upper() for g in (gene_symbols or [])]
+    drug_names   = [d.upper() for d in (drug_names or [])]
+
+    causal_hits     = []
+    verbs_found     = set()
+    total_scanned   = 0
+    strong_count    = 0
+    moderate_count  = 0
+    weak_count      = 0
+
+    for paper in papers:
+        # Handle both dict and Pydantic object
+        if hasattr(paper, "abstract"):
+            text   = f"{paper.abstract} {paper.summary}"
+            source = paper.title[:60]
+        else:
+            text   = f"{paper.get('abstract','')} {paper.get('summary','')}"
+            source = paper.get("title","")[:60]
+
+        if not text.strip():
+            continue
+
+        total_scanned += 1
+        text_lower     = text.lower()
+
+        # Split into sentences for context
+        sentences = [s.strip() for s in text.replace(".", ".\n").split("\n")
+                     if len(s.strip()) > 20]
+
+        for sentence in sentences:
+            sent_lower = sentence.lower()
+
+            for verb, strength in ALL_CAUSAL_VERBS.items():
+                if verb not in sent_lower:
+                    continue
+
+                # Check if sentence mentions our proteins or drugs
+                mentions_target = (
+                    any(g.lower() in sent_lower for g in gene_symbols) or
+                    any(d.lower() in sent_lower for d in drug_names) or
+                    # Also accept general biomedical causal statements
+                    any(kw in sent_lower for kw in
+                        ["amyloid", "protein", "pathway", "receptor",
+                         "enzyme", "kinase", "neuron", "cell"])
+                )
+
+                if mentions_target:
+                    verbs_found.add(verb)
+
+                    if strength == "strong":    strong_count   += 1
+                    elif strength == "moderate":moderate_count += 1
+                    else:                       weak_count     += 1
+
+                    causal_hits.append({
+                        "text":        sentence[:200],
+                        "causal_verb": verb,
+                        "source":      source,
+                        "strength":    strength
+                    })
+                    break  # One verb per sentence is enough
+
+    # ── Compute causal score ──────────────────────────────────
+    # Weighted: strong=1.0, moderate=0.6, weak=0.2
+    raw_score = (
+        strong_count   * 1.0 +
+        moderate_count * 0.6 +
+        weak_count     * 0.2
+    )
+
+    # Normalize: 5+ strong hits = max score
+    max_expected = 5.0
+    causal_score = round(min(1.0, raw_score / max_expected), 4)
+
+    # ── Label + color ─────────────────────────────────────────
+    if causal_score >= 0.6:
+        label = "Likely Causal"
+        color = "#22c55e"
+        note  = (f"Strong causal language detected in {strong_count} "
+                 f"sentences across {total_scanned} papers.")
+    elif causal_score >= 0.3:
+        label = "Possibly Causal"
+        color = "#f59e0b"
+        note  = (f"Moderate causal signals found. {moderate_count} "
+                 f"moderately causal statements detected.")
+    else:
+        label = "Correlational"
+        color = "#94a3b8"
+        note  = (f"Limited causal evidence. Literature shows association "
+                 f"but lacks direct mechanistic proof.")
+
+    # ── Build causal chain ────────────────────────────────────
+    causal_chain = []
+    if drug_names:
+        causal_chain.append(drug_names[0])
+    if verbs_found:
+        # Pick strongest verb found
+        for strength_tier in ["strong", "moderate", "weak"]:
+            tier_verbs = [v for v in verbs_found
+                          if ALL_CAUSAL_VERBS.get(v) == strength_tier]
+            if tier_verbs:
+                causal_chain.append(tier_verbs[0])
+                break
+    if gene_symbols:
+        causal_chain.append(gene_symbols[0])
+
+    return {
+        "causal_score":         causal_score,
+        "causal_label":         label,
+        "causal_color":         color,
+        "causal_evidence":      causal_hits[:5],   # Top 5 examples
+        "causal_verbs_found":   list(verbs_found),
+        "correlation_note":     note,
+        "causal_chain":         causal_chain,
+        "total_causal_hits":    len(causal_hits),
+        "total_papers_scanned": total_scanned
+    }
+
 
 # ── Quick test ──────────────────────────────────────────────
 if __name__ == "__main__":

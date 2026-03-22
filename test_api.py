@@ -1,35 +1,40 @@
-# test_api.py — verify scores + evidence strength
-import requests
-import json
+import requests, json
 
-response = requests.post(
-    "http://localhost:8000/analyze-disease",
-    json={
-        "disease_name": "Alzheimer disease",
-        "max_targets": 3,
-        "max_papers":  3,
-        "max_drugs":   2
-    },
-    timeout=180
+BASE = "http://localhost:8000"
+
+# Test available keys
+print("\n" + "="*50)
+print("AVAILABLE API KEYS:")
+r = requests.get(f"{BASE}/api/v1/keys")
+print(json.dumps(r.json(), indent=2)[:500])
+
+# Test with free key
+headers = {"X-API-Key": "demo-key-free-001"}
+
+print("\n" + "="*50)
+print("RANK DRUGS (with API key):")
+r = requests.post(
+    f"{BASE}/api/v1/rank-drugs",
+    json={"disease_name":"Alzheimer disease",
+          "max_targets":3,"max_papers":3,"max_drugs":2},
+    headers=headers, timeout=120
 )
+data = r.json()
+print(f"Status: {r.status_code}")
+print(f"Tier: {data.get('api_tier')}")
+for d in data.get("ranked_drugs",[])[:3]:
+    print(f"  #{d['rank']} {d['drug_name']} "
+          f"score={d['drug_score']} risk={d['risk_level']}")
 
-data = response.json()
-
-# Check hypothesis score fields
-print("=" * 50)
-print("HYPOTHESIS SCORE FIELDS:")
-print("=" * 50)
-for h in data["data"]["hypotheses"]:
-    print(f"\nTitle        : {h['title'][:55]}")
-    print(f"rank         : {h.get('rank')}")
-    print(f"final_score  : {h.get('final_score')}")
-    print(f"protein_score: {h.get('protein_score')}")
-    print(f"drug_score   : {h.get('drug_score')}")
-    print(f"paper_score  : {h.get('paper_score')}")
-    print(f"risk_penalty : {h.get('risk_penalty')}")
-
-# Check evidence strength
-print("\n" + "=" * 50)
-print("EVIDENCE STRENGTH:")
-print("=" * 50)
-print(json.dumps(data["data"].get("evidence_strength"), indent=2))
+print("\n" + "="*50)
+print("DECISION SUMMARY (GET endpoint):")
+r = requests.get(
+    f"{BASE}/api/v1/decision-summary/Alzheimer%20disease",
+    headers=headers, timeout=120
+)
+data = r.json()
+print(f"Status: {r.status_code}")
+rec = data.get("recommendation",{})
+print(f"Drug: {rec.get('recommended_drug')}")
+print(f"Conf: {rec.get('confidence_score'):.0%}")
+print(f"Risk: {rec.get('risk_level')}")
