@@ -1,5 +1,6 @@
 # backend/services/hypothesis_service.py
-# V2 — includes Hypothesis Ranking Engine (Feature 1)
+# V4 — All stages: Rank, Causal, Validation, Critique,
+#       Uncertainty, GO/NO-GO, Failure Prediction
 
 import os
 import json
@@ -7,6 +8,7 @@ from dotenv import load_dotenv
 from backend.models.schemas import Hypothesis, DiseaseAnalysisResult
 from backend.services.pipeline_service import build_llm_context
 from backend.services.paper_service import extract_causal_evidence
+from backend.services.decision_service import compute_hypothesis_go_no_go
 
 load_dotenv()
 
@@ -37,9 +39,7 @@ else:
 
 # ── 2. Prompt Templates ───────────────────────────────────────
 
-# ── 2. Prompt Templates (V2 — Feature 4 upgrade) ─────────────
-
-SYSTEM_PROMPT = """You are a senior biomedical research scientist specializing in 
+SYSTEM_PROMPT = """You are a senior biomedical research scientist specializing in
 drug discovery, molecular biology, and translational medicine.
 
 Your hypotheses are:
@@ -86,7 +86,7 @@ STRICT REQUIREMENTS — VIOLATING ANY = INVALID OUTPUT:
 
 3. reasoning_steps MUST contain 3-4 bullet points showing your logical chain:
    Step 1: What the protein does in disease context
-   Step 2: What the drug does mechanistically  
+   Step 2: What the drug does mechanistically
    Step 3: How they interact at the pathway level
    Step 4: Why this is therapeutically relevant
 
@@ -107,9 +107,9 @@ Return ONLY a valid JSON array — no markdown, no text outside JSON:
   {{
     "title": "Specific mechanism-based hypothesis in ≤25 words naming protein, drug, and pathway",
     "explanation": "3-4 sentences. Name exact pathway. Describe molecular mechanism. Explain therapeutic relevance. Reference specific evidence.",
-    "simple_explanation": "2-3 sentences using ONE clear analogy. Explain what the protein does, what the drug does, and why it matters.",
+    "simple_explanation": "2-3 sentences using ONE clear analogy.",
     "confidence_score": 0.0,
-    "confidence_reasoning": "Cite exact evidence: protein score, drug phase, paper count. Explain score numerically.",
+    "confidence_reasoning": "Cite exact evidence: protein score, drug phase, paper count.",
     "key_proteins": ["EXACT_GENE_SYMBOL"],
     "key_drugs": ["EXACT_DRUG_NAME"],
     "evidence_summary": "One sentence citing specific data points from the evidence provided.",
@@ -126,55 +126,32 @@ Return ONLY a valid JSON array — no markdown, no text outside JSON:
 
 # ── 3. Ranking Engine ─────────────────────────────────────────
 
-def compute_protein_score(
-    hypothesis:      Hypothesis,
-    pipeline_result: DiseaseAnalysisResult
-) -> float:
-    """
-    Score based on OpenTargets association scores of proteins
-    mentioned in this hypothesis. Returns average of matched scores.
-    """
+def compute_protein_score(hypothesis, pipeline_result):
     if not hypothesis.key_proteins:
         return 0.3
-
     scores = []
     for gene_symbol in hypothesis.key_proteins:
         for target in pipeline_result.protein_targets:
             if target.gene_symbol.upper() == gene_symbol.upper():
                 scores.append(target.association_score)
                 break
-
     return round(sum(scores) / len(scores), 4) if scores else 0.3
 
 
-def compute_drug_score(
-    hypothesis:      Hypothesis,
-    pipeline_result: DiseaseAnalysisResult
-) -> float:
-    """
-    Score based on highest clinical trial phase among mentioned drugs.
-    Phase 4=1.0, Phase 3=0.75, Phase 2=0.5, Phase 1=0.25, None=0.1
-    """
+def compute_drug_score(hypothesis, pipeline_result):
     PHASE_SCORES = {4: 1.0, 3: 0.75, 2: 0.5, 1: 0.25}
-
     if not hypothesis.key_drugs:
         return 0.1
-
     scores = []
     for drug_name in hypothesis.key_drugs:
         for drug in pipeline_result.drugs:
             if drug.drug_name.upper() == drug_name.upper():
                 scores.append(PHASE_SCORES.get(drug.clinical_phase, 0.1))
                 break
-
     return round(max(scores), 4) if scores else 0.1
 
 
-def compute_paper_score(pipeline_result: DiseaseAnalysisResult) -> float:
-    """
-    Score based on total research papers retrieved.
-    ≥8=1.0, 5-7=0.75, 2-4=0.5, 1=0.25, 0=0.0
-    """
+def compute_paper_score(pipeline_result):
     total = len(pipeline_result.papers)
     if total >= 8:   return 1.0
     elif total >= 5: return 0.75
@@ -183,17 +160,9 @@ def compute_paper_score(pipeline_result: DiseaseAnalysisResult) -> float:
     else:            return 0.0
 
 
-def compute_fda_risk_penalty(
-    hypothesis:      Hypothesis,
-    pipeline_result: DiseaseAnalysisResult
-) -> float:
-    """
-    Penalty based on FDA adverse event counts for mentioned drugs.
-    >200 reports=1.0 (high), 50-200=0.5 (medium), <50=0.1 (low)
-    """
+def compute_fda_risk_penalty(hypothesis, pipeline_result):
     if not hypothesis.key_drugs:
         return 0.0
-
     max_penalty = 0.0
     for drug_name in hypothesis.key_drugs:
         for drug in pipeline_result.drugs:
@@ -203,45 +172,25 @@ def compute_fda_risk_penalty(
                     penalty = 1.0 if count > 200 else 0.5 if count >= 50 else 0.1
                     max_penalty = max(max_penalty, penalty)
                 break
-
     return round(max_penalty, 4)
 
 
-def build_score_breakdown(
-    protein_score: float,
-    drug_score:    float,
-    paper_score:   float,
-    risk_penalty:  float,
-    final_score:   float
-) -> str:
-    """Human-readable explanation of score components."""
+def build_score_breakdown(p, d, pa, r, final):
     risk_label = (
-        "High risk"   if risk_penalty >= 0.8 else
-        "Medium risk" if risk_penalty >= 0.4 else
-        "Low risk"    if risk_penalty >  0.0 else
+        "High risk"   if r >= 0.8 else
+        "Medium risk" if r >= 0.4 else
+        "Low risk"    if r >  0.0 else
         "No FDA data"
     )
     return (
-        f"Protein: {protein_score:.2f}×0.4 | "
-        f"Drug phase: {drug_score:.2f}×0.3 | "
-        f"Papers: {paper_score:.2f}×0.2 | "
-        f"FDA penalty: -{risk_penalty:.2f}×0.1 ({risk_label}) | "
-        f"Final: {final_score:.3f}"
+        f"Protein: {p:.2f}×0.4 | Drug phase: {d:.2f}×0.3 | "
+        f"Papers: {pa:.2f}×0.2 | FDA penalty: -{r:.2f}×0.1 "
+        f"({risk_label}) | Final: {final:.3f}"
     )
 
 
-def rank_hypotheses(
-    hypotheses:      list,
-    pipeline_result: DiseaseAnalysisResult
-) -> list:
-    """
-    Compute weighted score for each hypothesis and sort best-first.
-
-    Formula:
-        final = 0.4×protein + 0.3×drug + 0.2×papers - 0.1×risk_penalty
-    """
+def rank_hypotheses(hypotheses, pipeline_result):
     print("\n📊 Running Hypothesis Ranking Engine...")
-
     shared_paper_score = compute_paper_score(pipeline_result)
 
     for hyp in hypotheses:
@@ -249,7 +198,6 @@ def rank_hypotheses(
         d  = compute_drug_score(hyp, pipeline_result)
         pa = shared_paper_score
         r  = compute_fda_risk_penalty(hyp, pipeline_result)
-
         final = round(max(0.0, min(1.0, 0.4*p + 0.3*d + 0.2*pa - 0.1*r)), 4)
 
         hyp.protein_score   = p
@@ -259,13 +207,10 @@ def rank_hypotheses(
         hyp.final_score     = final
         hyp.score_breakdown = build_score_breakdown(p, d, pa, r, final)
 
-        print(
-            f"   • {hyp.title[:50]}...\n"
-            f"     protein={p:.2f} drug={d:.2f} "
-            f"papers={pa:.2f} risk=-{r:.2f} → final={final:.4f}"
-        )
+        print(f"   • {hyp.title[:50]}...\n"
+              f"     protein={p:.2f} drug={d:.2f} "
+              f"papers={pa:.2f} risk=-{r:.2f} → final={final:.4f}")
 
-    # Sort descending by final_score, assign ranks
     hypotheses.sort(key=lambda h: h.final_score, reverse=True)
     for i, hyp in enumerate(hypotheses, 1):
         hyp.rank = i
@@ -276,39 +221,37 @@ def rank_hypotheses(
         medal = medals.get(hyp.rank, f"#{hyp.rank}")
         print(f"   {medal} Rank {hyp.rank}: score={hyp.final_score:.4f} — "
               f"{hyp.title[:45]}...")
-
     return hypotheses
 
 
 # ── 4. Mock Hypotheses ────────────────────────────────────────
 
-def get_mock_hypotheses(disease_name: str) -> list[Hypothesis]:
-    """Fallback hypotheses when no LLM key is configured."""
+def get_mock_hypotheses(disease_name: str) -> list:
     return [
         Hypothesis(
-            title             = f"PSEN1 gamma-secretase inhibition via Nirogacestat may reduce amyloid-beta in {disease_name}",
+            title             = f"PSEN1 gamma-secretase inhibition via Nirogacestat in {disease_name}",
             explanation       = "PSEN1 encodes presenilin-1, the catalytic subunit of gamma-secretase which cleaves APP into amyloid-beta. Nirogacestat blocks this cleavage, reducing neurotoxic amyloid-beta42 production targeting the amyloid cascade directly.",
-            simple_explanation= "Think of PSEN1 as scissors cutting a protein into toxic pieces. Nirogacestat acts like a blade guard — stopping the cut that produces harmful fragments.",
+            simple_explanation= "Think of PSEN1 as scissors cutting a protein into toxic pieces. Nirogacestat acts like a blade guard.",
             confidence_score  = 0.82,
             confidence_label  = "High",
             key_proteins      = ["PSEN1"],
             key_drugs         = ["NIROGACESTAT"],
-            evidence_summary  = "PSEN1 highest association score (0.867), Nirogacestat Phase 4 gamma-secretase inhibitor"
+            evidence_summary  = "PSEN1 highest association score (0.867), Nirogacestat Phase 4"
         ),
         Hypothesis(
-            title             = "Lecanemab-mediated APP clearance may synergize with APOE modulation to reduce neurodegeneration",
-            explanation       = "APP-derived amyloid-beta oligomers drive neurodegeneration. Lecanemab targets these for clearance while APOE4 impairs clearance. Combining both addresses production and clearance failure simultaneously.",
-            simple_explanation= "Alzheimer's is like a clogged drain — plaques are the blockage. Lecanemab is drain cleaner, APOE therapy improves the drain's natural ability. Together they clear faster.",
+            title             = "Lecanemab APP clearance via amyloidogenic pathway in {disease_name}",
+            explanation       = "APP-derived amyloid-beta oligomers drive neurodegeneration. Lecanemab targets these for clearance in the amyloidogenic pathway.",
+            simple_explanation= "Alzheimer's is like a clogged drain. Lecanemab is drain cleaner.",
             confidence_score  = 0.71,
             confidence_label  = "Medium-High",
-            key_proteins      = ["APP", "APOE"],
+            key_proteins      = ["APP"],
             key_drugs         = ["LECANEMAB"],
-            evidence_summary  = "APP score 0.854, APOE score 0.782; Lecanemab FDA-approved Phase 4"
+            evidence_summary  = "APP score 0.854; Lecanemab FDA-approved Phase 4"
         ),
         Hypothesis(
-            title             = "GRIN1 NMDA modulation may protect neurons from amyloid-induced excitotoxicity",
-            explanation       = "GRIN1 mediates glutamate excitotoxicity — secondary neuronal death in Alzheimer's. Amyloid-beta sensitizes NMDA receptors causing calcium overload. NMDA antagonists reduce excitotoxic calcium influx.",
-            simple_explanation= "Brain cells get overstimulated and burn out in Alzheimer's. GRIN1 is the volume knob. Turning it down partially prevents the speakers from blowing out.",
+            title             = "GRIN1 NMDA modulation protects against excitotoxicity in {disease_name}",
+            explanation       = "GRIN1 mediates glutamate excitotoxicity via NMDA receptor pathway. NMDA antagonists reduce excitotoxic calcium influx.",
+            simple_explanation= "Brain cells get overstimulated. GRIN1 is the volume knob.",
             confidence_score  = 0.65,
             confidence_label  = "Medium-High",
             key_proteins      = ["GRIN1"],
@@ -328,40 +271,26 @@ def calculate_confidence_label(score: float) -> str:
     else:              return "Low"
 
 
-def validate_hypothesis_quality(hyp_data: dict) -> tuple[bool, str]:
-    """
-    Validate that a hypothesis meets quality standards.
-    Returns (is_valid, reason_if_invalid)
-    """
-    title       = hyp_data.get("title", "")
+def validate_hypothesis_quality(hyp_data: dict) -> tuple:
+    proteins  = hyp_data.get("key_proteins", [])
+    drugs     = hyp_data.get("key_drugs", [])
     explanation = hyp_data.get("explanation", "")
     reasoning   = hyp_data.get("reasoning_steps", [])
-    proteins    = hyp_data.get("key_proteins", [])
-    drugs       = hyp_data.get("key_drugs", [])
 
-    # Must have proteins tagged
     if not proteins:
         return False, "No key_proteins tagged"
-
-    # Must have drugs tagged
     if not drugs:
         return False, "No key_drugs tagged"
-
-    # Explanation must be substantial
     if len(explanation) < 100:
         return False, f"Explanation too short ({len(explanation)} chars)"
-
-    # Must have reasoning steps
     if len(reasoning) < 2:
         return False, f"Insufficient reasoning steps ({len(reasoning)})"
 
-    # Check for banned vague phrases
     vague_phrases = ["may play a role", "could be involved", "might help with"]
     for phrase in vague_phrases:
         if phrase.lower() in explanation.lower():
             return False, f"Contains vague phrase: '{phrase}'"
 
-    # Must mention a pathway keyword
     pathway_keywords = [
         "pathway", "cascade", "receptor", "inhibit", "modulate",
         "cleav", "aggregat", "secretase", "kinase", "signaling"
@@ -372,11 +301,7 @@ def validate_hypothesis_quality(hyp_data: dict) -> tuple[bool, str]:
     return True, "OK"
 
 
-def parse_hypothesis_response(raw_json: str, disease_name: str) -> list[Hypothesis]:
-    """
-    Parse, validate, and convert LLM JSON into Hypothesis objects.
-    Filters out low-quality hypotheses with detailed logging.
-    """
+def parse_hypothesis_response(raw_json: str, disease_name: str) -> list:
     cleaned = raw_json.strip()
     if cleaned.startswith("```"):
         lines   = cleaned.split("\n")
@@ -391,7 +316,6 @@ def parse_hypothesis_response(raw_json: str, disease_name: str) -> list[Hypothes
         rejected   = 0
 
         for item in data:
-            # Validate quality
             is_valid, reason = validate_hypothesis_quality(item)
             if not is_valid:
                 print(f"   ⚠️  Hypothesis rejected — {reason}: "
@@ -416,7 +340,6 @@ def parse_hypothesis_response(raw_json: str, disease_name: str) -> list[Hypothes
 
         if rejected > 0:
             print(f"   ⚠️  {rejected} hypothesis(es) rejected for quality")
-
         if not hypotheses:
             print("   ⚠️  All hypotheses failed validation — using mocks")
             return get_mock_hypotheses(disease_name)
@@ -428,20 +351,13 @@ def parse_hypothesis_response(raw_json: str, disease_name: str) -> list[Hypothes
         print(f"   ❌ JSON parse error: {e}")
         return get_mock_hypotheses(disease_name)
 
-def add_causal_analysis(
-    hypotheses:      list,
-    pipeline_result: DiseaseAnalysisResult
-) -> list:
-    """
-    Add causal analysis to each hypothesis by scanning
-    supporting papers for causal language related to
-    each hypothesis's proteins and drugs.
-    """
+
+# ── 6. Stage Functions ────────────────────────────────────────
+
+def add_causal_analysis(hypotheses, pipeline_result):
     from backend.models.schemas import CausalAnalysis, CausalEvidence
 
     print("\n🔬 Running causal reasoning analysis...")
-
-    # Convert papers to dicts for the extractor
     papers = [
         p.model_dump() if hasattr(p, "model_dump") else p
         for p in pipeline_result.papers
@@ -453,8 +369,6 @@ def add_causal_analysis(
             gene_symbols = hyp.key_proteins,
             drug_names   = hyp.key_drugs
         )
-
-        # Convert evidence dicts to CausalEvidence objects
         evidence_objects = [
             CausalEvidence(
                 text        = e.get("text",""),
@@ -464,7 +378,6 @@ def add_causal_analysis(
             )
             for e in causal_data.get("causal_evidence", [])
         ]
-
         hyp.causal_analysis = CausalAnalysis(
             causal_score         = causal_data["causal_score"],
             causal_label         = causal_data["causal_label"],
@@ -476,44 +389,27 @@ def add_causal_analysis(
             total_causal_hits    = causal_data["total_causal_hits"],
             total_papers_scanned = causal_data["total_papers_scanned"]
         )
-
-        label = hyp.causal_analysis.causal_label
-        score = hyp.causal_analysis.causal_score
-        print(f"   • {hyp.title[:50]}...")
-        print(f"     Causal: {label} (score: {score:.2f}) | "
+        print(f"   • {hyp.title[:50]}...\n"
+              f"     Causal: {hyp.causal_analysis.causal_label} "
+              f"(score: {hyp.causal_analysis.causal_score:.2f}) | "
               f"hits: {causal_data['total_causal_hits']} | "
               f"verbs: {causal_data['causal_verbs_found'][:3]}")
 
     return hypotheses
 
-def generate_validation_suggestions(
-    hypotheses:      list,
-    pipeline_result: DiseaseAnalysisResult
-) -> list:
-    """
-    Feature 4: Add experimental validation suggestions to each hypothesis.
 
-    Uses a focused LLM prompt to suggest:
-    - In-vitro assay (cell culture experiments)
-    - In-vivo model (animal studies)
-    - Clinical approach (human trials/biomarkers)
-
-    Runs as a single batched LLM call for efficiency.
-    """
+def generate_validation_suggestions(hypotheses, pipeline_result):
     from backend.models.schemas import ValidationSuggestion
 
     if LLM_PROVIDER == "mock" or client is None:
-        # Add mock validation suggestions
         for hyp in hypotheses:
             hyp.validation_suggestion = _mock_validation(hyp)
         return hypotheses
 
     print("\n🧪 Generating experimental validation suggestions...")
 
-    # Build batched prompt for all hypotheses at once
     hyp_list = "\n\n".join([
-        f"Hypothesis {i+1}:\n"
-        f"Title: {hyp.title}\n"
+        f"Hypothesis {i+1}:\nTitle: {hyp.title}\n"
         f"Protein: {', '.join(hyp.key_proteins)}\n"
         f"Drug: {', '.join(hyp.key_drugs)}\n"
         f"Explanation: {hyp.explanation[:200]}"
@@ -522,108 +418,68 @@ def generate_validation_suggestions(
 
     prompt = f"""
 You are an experimental biologist and drug discovery scientist.
-
 For each hypothesis below, suggest ONE specific experimental validation method.
-
 DISEASE CONTEXT: {pipeline_result.disease_name}
-
 HYPOTHESES:
 {hyp_list}
-
-For each hypothesis, choose the MOST appropriate validation type:
-- "In-vitro": Cell culture, protein assays, biochemical experiments
-- "In-vivo": Animal models (mouse, rat, zebrafish)
-- "Clinical": Biomarker analysis, patient data, clinical trials
 
 Return ONLY a JSON array with exactly {len(hypotheses)} objects:
 [
   {{
     "hypothesis_index": 0,
     "validation_type": "In-vitro",
-    "experiment_title": "Short name of the experiment (max 8 words)",
-    "experiment_description": "2-3 sentences describing exact protocol, cell line or model, measurement method, and what you are testing.",
+    "experiment_title": "Short name (max 8 words)",
+    "experiment_description": "2-3 sentences describing protocol.",
     "required_tools": ["tool1", "tool2", "tool3"],
-    "expected_outcome": "One sentence: what does a positive result look like?",
+    "expected_outcome": "One sentence: what does success look like?",
     "estimated_timeline": "X-Y months",
     "difficulty": "Low"
   }}
 ]
-
-VALIDATION TYPE GUIDELINES:
-- Phase 4 drugs → Clinical (already proven, test biomarkers)
-- Phase 2-3 drugs → In-vivo (needs animal validation)
-- Phase 1 or unknown → In-vitro (start with cell models)
-- Proteins with known cell lines → In-vitro
-- Neurodegeneration targets → In-vivo (mouse models preferred)
-
-DIFFICULTY GUIDELINES:
-- Low: Standard assays, common cell lines, 1-3 months
-- Medium: Specialized models, complex protocols, 3-6 months
-- High: Transgenic animals, clinical samples, 6+ months
-
-Return ONLY valid JSON array. No markdown, no text outside JSON.
+VALIDATION TYPE: Phase 4 → Clinical, Phase 2-3 → In-vivo, Phase 1 → In-vitro
+DIFFICULTY: Low=1-3mo, Medium=3-6mo, High=6+mo
+Return ONLY valid JSON. No markdown.
 """
 
     try:
         response = client.chat.completions.create(
-            model       = LLM_MODEL,
-            messages    = [
-                {"role": "system", "content":
-                 "You are an expert experimental biologist. "
-                 "Always return valid JSON only."},
+            model=LLM_MODEL,
+            messages=[
+                {"role": "system", "content": "Expert experimental biologist. Return only valid JSON."},
                 {"role": "user", "content": prompt}
             ],
-            temperature = 0.3,
-            max_tokens  = 1500,
+            temperature=0.3, max_tokens=1500,
         )
-
         raw = response.choices[0].message.content.strip()
         print(f"   ✅ Validation LLM responded ({len(raw)} chars)")
-
-        # Clean JSON
         if raw.startswith("```"):
             lines = raw.split("\n")
             raw   = "\n".join(lines[1:-1])
 
         suggestions = json.loads(raw)
-
         for item in suggestions:
             idx = item.get("hypothesis_index", 0)
             if idx < len(hypotheses):
-                v_type  = item.get("validation_type", "In-vitro")
-                v_color = {
-                    "In-vitro": "#3b82f6",
-                    "In-vivo":  "#8b5cf6",
-                    "Clinical": "#f59e0b"
-                }.get(v_type, "#64748b")
-
-                diff       = item.get("difficulty", "Medium")
-                diff_color = {
-                    "Low":    "#22c55e",
-                    "Medium": "#f59e0b",
-                    "High":   "#ef4444"
-                }.get(diff, "#64748b")
-
+                v_type = item.get("validation_type", "In-vitro")
+                v_color= {"In-vitro":"#3b82f6","In-vivo":"#8b5cf6","Clinical":"#f59e0b"}.get(v_type,"#64748b")
+                diff   = item.get("difficulty","Medium")
+                d_color= {"Low":"#22c55e","Medium":"#f59e0b","High":"#ef4444"}.get(diff,"#64748b")
                 hypotheses[idx].validation_suggestion = ValidationSuggestion(
                     validation_type        = v_type,
                     validation_color       = v_color,
-                    experiment_title       = item.get("experiment_title", ""),
-                    experiment_description = item.get("experiment_description", ""),
-                    required_tools         = item.get("required_tools", []),
-                    expected_outcome       = item.get("expected_outcome", ""),
-                    estimated_timeline     = item.get("estimated_timeline", ""),
+                    experiment_title       = item.get("experiment_title",""),
+                    experiment_description = item.get("experiment_description",""),
+                    required_tools         = item.get("required_tools",[]),
+                    expected_outcome       = item.get("expected_outcome",""),
+                    estimated_timeline     = item.get("estimated_timeline",""),
                     difficulty             = diff,
-                    difficulty_color       = diff_color
+                    difficulty_color       = d_color
                 )
-
-                hyp = hypotheses[idx]
-                print(f"   • {hyp.title[:45]}...")
-                print(f"     → {v_type} | {diff} difficulty | "
-                      f"{item.get('estimated_timeline','?')}")
+                print(f"   • {hypotheses[idx].title[:45]}...\n"
+                      f"     → {v_type} | {diff} | {item.get('estimated_timeline','?')}")
 
     except Exception as e:
         print(f"   ⚠️  Validation generation error: {e}")
-        print("   ℹ️  Using mock validation suggestions")
         for hyp in hypotheses:
             if not hyp.validation_suggestion:
                 hyp.validation_suggestion = _mock_validation(hyp)
@@ -631,26 +487,17 @@ Return ONLY valid JSON array. No markdown, no text outside JSON.
     return hypotheses
 
 
-def _mock_validation(hyp) -> "ValidationSuggestion":
-    """Fallback mock validation suggestion."""
+def _mock_validation(hyp):
     from backend.models.schemas import ValidationSuggestion
-
-    proteins = hyp.key_proteins
-    drugs    = hyp.key_drugs
-    drug     = drugs[0] if drugs else "the compound"
-    protein  = proteins[0] if proteins else "the target protein"
-
-    # Pick type based on drug name patterns
+    drug    = hyp.key_drugs[0] if hyp.key_drugs else "the compound"
+    protein = hyp.key_proteins[0] if hyp.key_proteins else "the target"
     drug_upper = drug.upper()
     if any(x in drug_upper for x in ["MAB","UMAB","ZUMAB","NUMAB"]):
-        v_type = "Clinical"
-        v_color= "#f59e0b"
-    elif any(x in drug_upper for x in ["STAT","STAT","CEMAB"]):
-        v_type = "In-vivo"
-        v_color= "#8b5cf6"
+        v_type, v_color = "Clinical", "#f59e0b"
+    elif any(x in drug_upper for x in ["STAT","CEMAB"]):
+        v_type, v_color = "In-vivo", "#8b5cf6"
     else:
-        v_type = "In-vitro"
-        v_color= "#3b82f6"
+        v_type, v_color = "In-vitro", "#3b82f6"
 
     return ValidationSuggestion(
         validation_type        = v_type,
@@ -658,40 +505,18 @@ def _mock_validation(hyp) -> "ValidationSuggestion":
         experiment_title       = f"{protein} activity assay with {drug}",
         experiment_description = (
             f"Treat {protein}-expressing cell lines with increasing "
-            f"concentrations of {drug}. Measure protein activity, "
-            f"downstream pathway markers, and cell viability using "
-            f"standard biochemical assays."
+            f"concentrations of {drug}. Measure protein activity and "
+            f"downstream pathway markers using standard biochemical assays."
         ),
-        required_tools         = [
-            "Cell culture facility",
-            "Western blot apparatus",
-            "ELISA kit",
-            "Flow cytometer"
-        ],
-        expected_outcome       = (
-            f"Dose-dependent reduction in {protein} activity "
-            f"with corresponding decrease in disease-relevant biomarkers."
-        ),
-        estimated_timeline     = "3-6 months",
-        difficulty             = "Medium",
-        difficulty_color       = "#f59e0b"
+        required_tools   = ["Cell culture facility","Western blot","ELISA kit","Flow cytometer"],
+        expected_outcome = f"Dose-dependent reduction in {protein} activity.",
+        estimated_timeline = "3-6 months",
+        difficulty         = "Medium",
+        difficulty_color   = "#f59e0b"
     )
 
-def generate_hypothesis_critiques(
-    hypotheses:      list,
-    pipeline_result: DiseaseAnalysisResult
-) -> list:
-    """
-    Feature 5: Critically evaluate each hypothesis.
 
-    Uses a second LLM pass to identify:
-    - Scientific weaknesses
-    - Contradictory evidence
-    - Clinical/safety risks
-    - How to strengthen the hypothesis
-
-    Runs as a single batched LLM call for efficiency.
-    """
+def generate_hypothesis_critiques(hypotheses, pipeline_result):
     from backend.models.schemas import HypothesisCritique
 
     if LLM_PROVIDER == "mock" or client is None:
@@ -702,8 +527,7 @@ def generate_hypothesis_critiques(
     print("\n🔍 Generating hypothesis critiques...")
 
     hyp_list = "\n\n".join([
-        f"Hypothesis {i+1}:\n"
-        f"Title: {hyp.title}\n"
+        f"Hypothesis {i+1}:\nTitle: {hyp.title}\n"
         f"Protein: {', '.join(hyp.key_proteins)}\n"
         f"Drug: {', '.join(hyp.key_drugs)}\n"
         f"Confidence: {hyp.confidence_score}\n"
@@ -713,101 +537,59 @@ def generate_hypothesis_critiques(
 
     prompt = f"""
 You are a senior peer reviewer and critical biomedical scientist.
+Critically evaluate each hypothesis for {pipeline_result.disease_name}.
 
-Critically evaluate each hypothesis below for {pipeline_result.disease_name}.
-Be scientifically rigorous and honest about limitations.
-
-HYPOTHESES TO CRITIQUE:
+HYPOTHESES:
 {hyp_list}
-
-AVAILABLE EVIDENCE CONTEXT:
-- Proteins: {', '.join([p.gene_symbol for p in pipeline_result.protein_targets[:5]])}
-- Drugs in pipeline: {', '.join([d.drug_name for d in pipeline_result.drugs[:5]])}
-- Papers available: {len(pipeline_result.papers)}
-
-For each hypothesis, provide a critical evaluation.
 
 Return ONLY a JSON array with exactly {len(hypotheses)} objects:
 [
   {{
     "hypothesis_index": 0,
-    "overall_assessment": "One sentence verdict on the hypothesis strength",
-    "weaknesses": [
-      "Specific weakness 1 (be concrete, not generic)",
-      "Specific weakness 2",
-      "Specific weakness 3"
-    ],
-    "contradictory_evidence": [
-      "Known fact or study that contradicts or complicates this hypothesis",
-      "Second contradiction if applicable"
-    ],
-    "risks": [
-      "Specific clinical or scientific risk",
-      "Second risk if applicable"
-    ],
-    "confidence_impact": "One sentence: how do these critiques affect overall confidence?",
-    "salvage_suggestion": "One concrete suggestion to strengthen or validate this hypothesis",
-    "critique_severity": "Minor"
+    "overall_assessment": "One sentence verdict",
+    "weaknesses": ["Weakness 1","Weakness 2","Weakness 3"],
+    "contradictory_evidence": ["Contradiction 1","Contradiction 2"],
+    "risks": ["Risk 1","Risk 2"],
+    "confidence_impact": "One sentence on confidence impact",
+    "salvage_suggestion": "One concrete suggestion",
+    "critique_severity": "Moderate"
   }}
 ]
-
-SEVERITY GUIDELINES:
-- "Minor": Small gaps, hypothesis still strong, easy to address
-- "Moderate": Real limitations, needs additional validation, confidence reduced
-- "Major": Significant contradictions or safety concerns, high-risk hypothesis
-
-IMPORTANT RULES:
-- Be specific, not generic (avoid "more research is needed")
-- Reference actual biology (mention specific pathways, proteins, mechanisms)
-- For Phase 4 drugs, focus on known clinical failures or safety signals
-- Keep weaknesses to 2-3 most important ones
-- Return ONLY valid JSON. No markdown.
+SEVERITY: Minor / Moderate / Major. Return ONLY valid JSON.
 """
 
     try:
         response = client.chat.completions.create(
-            model       = LLM_MODEL,
-            messages    = [
-                {"role": "system", "content":
-                 "You are a rigorous peer reviewer. "
-                 "Return only valid JSON."},
-                {"role": "user", "content": prompt}
+            model=LLM_MODEL,
+            messages=[
+                {"role":"system","content":"Rigorous peer reviewer. Return only valid JSON."},
+                {"role":"user","content":prompt}
             ],
-            temperature = 0.3,
-            max_tokens  = 2000,
+            temperature=0.3, max_tokens=2000,
         )
-
         raw = response.choices[0].message.content.strip()
         print(f"   ✅ Critique LLM responded ({len(raw)} chars)")
-
         if raw.startswith("```"):
             lines = raw.split("\n")
             raw   = "\n".join(lines[1:-1])
 
-        critiques = json.loads(raw)
-
-        severity_colors = {
-            "Minor":    "#22c55e",
-            "Moderate": "#f59e0b",
-            "Major":    "#ef4444"
-        }
-
-        for item in critiques:
-            idx = item.get("hypothesis_index", 0)
+        severity_colors = {"Minor":"#22c55e","Moderate":"#f59e0b","Major":"#ef4444"}
+        for item in json.loads(raw):
+            idx = item.get("hypothesis_index",0)
             if idx < len(hypotheses):
-                severity = item.get("critique_severity", "Moderate")
+                sev = item.get("critique_severity","Moderate")
                 hypotheses[idx].critique = HypothesisCritique(
-                    overall_assessment      = item.get("overall_assessment",""),
-                    weaknesses              = item.get("weaknesses",[]),
-                    contradictory_evidence  = item.get("contradictory_evidence",[]),
-                    risks                   = item.get("risks",[]),
-                    confidence_impact       = item.get("confidence_impact",""),
-                    salvage_suggestion      = item.get("salvage_suggestion",""),
-                    critique_severity       = severity,
-                    severity_color          = severity_colors.get(severity,"#f59e0b")
+                    overall_assessment     = item.get("overall_assessment",""),
+                    weaknesses             = item.get("weaknesses",[]),
+                    contradictory_evidence = item.get("contradictory_evidence",[]),
+                    risks                  = item.get("risks",[]),
+                    confidence_impact      = item.get("confidence_impact",""),
+                    salvage_suggestion     = item.get("salvage_suggestion",""),
+                    critique_severity      = sev,
+                    severity_color         = severity_colors.get(sev,"#f59e0b")
                 )
-                print(f"   • {hypotheses[idx].title[:45]}...")
-                print(f"     Severity: {severity} | "
+                print(f"   • {hypotheses[idx].title[:45]}...\n"
+                      f"     Severity: {sev} | "
                       f"Weaknesses: {len(item.get('weaknesses',[]))} | "
                       f"Risks: {len(item.get('risks',[]))}")
 
@@ -820,64 +602,288 @@ IMPORTANT RULES:
     return hypotheses
 
 
-def _mock_critique(hyp) -> "HypothesisCritique":
-    """Fallback mock critique."""
+def _mock_critique(hyp):
     from backend.models.schemas import HypothesisCritique
-
     protein = hyp.key_proteins[0] if hyp.key_proteins else "the target"
     drug    = hyp.key_drugs[0] if hyp.key_drugs else "the compound"
-
     return HypothesisCritique(
-        overall_assessment     = (
-            f"Hypothesis is plausible but requires additional validation "
-            f"to establish direct causality."
-        ),
+        overall_assessment     = "Hypothesis is plausible but requires additional validation.",
         weaknesses             = [
-            f"Limited direct evidence linking {drug} specifically to "
-            f"{protein} modulation in disease context.",
-            f"Association score from OpenTargets reflects correlation, "
-            f"not confirmed mechanistic causality.",
-            "Available paper evidence is insufficient to rule out "
-            "off-target effects."
+            f"Limited direct evidence linking {drug} to {protein} modulation.",
+            "Association score reflects correlation, not confirmed causality.",
+            "Insufficient paper evidence to rule out off-target effects."
         ],
         contradictory_evidence = [
-            f"Some clinical trials targeting similar pathways have shown "
-            f"limited cognitive benefit despite reducing biomarkers.",
-            "Blood-brain barrier penetration of compound not confirmed "
-            "in all patient populations."
+            "Some trials targeting similar pathways show limited cognitive benefit.",
+            "Blood-brain barrier penetration not confirmed in all populations."
         ],
         risks                  = [
-            f"FDA adverse event signals suggest monitoring required "
-            f"for {drug}.",
-            "Pathway redundancy may reduce therapeutic impact if "
-            "compensatory mechanisms activate."
+            f"FDA adverse event signals require monitoring for {drug}.",
+            "Pathway redundancy may reduce therapeutic impact."
         ],
-        confidence_impact      = (
-            "These limitations reduce certainty from High to Medium-High. "
-            "Hypothesis remains viable but needs experimental confirmation."
-        ),
-        salvage_suggestion     = (
-            f"Design an in-vitro assay specifically measuring {protein} "
-            f"activity changes after {drug} treatment in disease-relevant "
-            f"cell models to establish direct mechanistic link."
-        ),
-        critique_severity  = "Moderate",
-        severity_color     = "#f59e0b"
+        confidence_impact      = "Reduces certainty from High to Medium-High.",
+        salvage_suggestion     = f"Design in-vitro assay measuring {protein} activity after {drug} treatment.",
+        critique_severity      = "Moderate",
+        severity_color         = "#f59e0b"
     )
 
 
-# ── 6. Main Generation Function ───────────────────────────────
+def add_hypothesis_uncertainty(hypotheses, pipeline_result):
+    from backend.services.pipeline_service import compute_uncertainty
+
+    print("\n📐 Computing per-hypothesis uncertainty...")
+    for hyp in hypotheses:
+        hyp.uncertainty = compute_uncertainty(pipeline_result, hyp)
+        print(f"   • {hyp.title[:45]}...\n"
+              f"     Uncertainty: {hyp.uncertainty.uncertainty_label} "
+              f"({hyp.uncertainty.uncertainty_score:.3f})")
+    return hypotheses
+
+
+def add_hypothesis_go_no_go(hypotheses, pipeline_result):
+    from backend.services.decision_service import compute_hypothesis_go_no_go
+
+    print("\n🚦 Computing GO/NO-GO decisions...")
+    for hyp in hypotheses:
+        hyp.go_no_go = compute_hypothesis_go_no_go(hyp, pipeline_result)
+        print(f"   {hyp.go_no_go.decision_emoji} {hyp.go_no_go.decision}"
+              f" — {hyp.title[:45]}...")
+    return hypotheses
+
+
+def generate_failure_predictions(hypotheses, pipeline_result):
+    from backend.models.schemas import FailurePrediction, FailureReason
+
+    if LLM_PROVIDER == "mock" or client is None:
+        for hyp in hypotheses:
+            hyp.failure_prediction = _mock_failure_prediction(hyp)
+        return hypotheses
+
+    print("\n⚠️  Predicting failure risks...")
+
+    hyp_list = "\n\n".join([
+        f"Hypothesis {i+1}:\nTitle: {hyp.title}\n"
+        f"Drug: {', '.join(hyp.key_drugs)}\n"
+        f"Protein: {', '.join(hyp.key_proteins)}\n"
+        f"Mechanism: {hyp.explanation[:200]}\n"
+        f"Clinical Phase: {_get_drug_phase(hyp.key_drugs, pipeline_result)}\n"
+        f"FDA Risk: {_get_drug_risk(hyp.key_drugs, pipeline_result)}"
+        for i, hyp in enumerate(hypotheses)
+    ])
+
+    prompt = f"""
+You are a drug development expert with deep knowledge of clinical trial failures.
+Analyze each hypothesis for {pipeline_result.disease_name} and predict failure risks.
+
+HYPOTHESES:
+{hyp_list}
+
+CONTEXT:
+- Disease: {pipeline_result.disease_name}
+- Papers: {len(pipeline_result.papers)}
+- Evidence: {pipeline_result.evidence_strength.evidence_label if pipeline_result.evidence_strength else 'Unknown'}
+
+Return ONLY a JSON array with exactly {len(hypotheses)} objects:
+[
+  {{
+    "hypothesis_index": 0,
+    "failure_risk_score": 0.45,
+    "top_failure_reason": "Single most likely failure mode",
+    "historical_context": "1-2 sentences about similar failed drugs",
+    "success_probability": 0.65,
+    "failure_reasons": [
+      {{
+        "category": "Safety",
+        "reason": "Specific failure reason",
+        "severity": "High",
+        "evidence": "Supporting evidence",
+        "mitigation": "How to address"
+      }}
+    ],
+    "recommended_safeguards": ["Safeguard 1","Safeguard 2"]
+  }}
+]
+
+IMPORTANT: success_probability MUST be a decimal 0.0-1.0 (e.g. 0.65 NOT 65).
+
+FAILURE RISK SCORE: 0.0-0.3=Low, 0.3-0.5=Medium, 0.5-0.7=High, 0.7-1.0=Very High
+
+SUCCESS PROBABILITY (decimal 0.0-1.0):
+- Phase 4: 0.60-0.80
+- Phase 3: 0.40-0.60
+- Phase 2: 0.20-0.40
+- Phase 1: 0.10-0.20
+
+CATEGORIES: Safety, Efficacy, Mechanism, Trial Design, Market
+Return ONLY valid JSON. No markdown.
+"""
+
+    try:
+        response = client.chat.completions.create(
+            model=LLM_MODEL,
+            messages=[
+                {"role":"system","content":"Drug development expert. Return only valid JSON."},
+                {"role":"user","content":prompt}
+            ],
+            temperature=0.3, max_tokens=2000,
+        )
+        raw = response.choices[0].message.content.strip()
+        print(f"   ✅ Failure prediction LLM responded ({len(raw)} chars)")
+        if raw.startswith("```"):
+            lines = raw.split("\n")
+            raw   = "\n".join(lines[1:-1])
+
+        risk_colors = {"Low":"#22c55e","Medium":"#f59e0b",
+                       "High":"#f97316","Very High":"#ef4444"}
+
+        for item in json.loads(raw):
+            idx = item.get("hypothesis_index",0)
+            if idx >= len(hypotheses):
+                continue
+
+            risk_score = max(0.0, min(1.0, float(item.get("failure_risk_score",0.5))))
+
+            if risk_score >= 0.7:        risk_label = "Very High"
+            elif risk_score >= 0.5:      risk_label = "High"
+            elif risk_score >= 0.3:      risk_label = "Medium"
+            else:                        risk_label = "Low"
+
+            # ── Fix: normalize success_probability ────────────
+            raw_sp       = float(item.get("success_probability", 0.5))
+            success_prob = raw_sp / 100.0 if raw_sp > 1.0 else raw_sp
+            success_prob = round(max(0.0, min(1.0, success_prob)), 3)
+
+            reasons = [
+                FailureReason(
+                    category   = r.get("category",""),
+                    reason     = r.get("reason",""),
+                    severity   = r.get("severity","Medium"),
+                    evidence   = r.get("evidence",""),
+                    mitigation = r.get("mitigation","")
+                )
+                for r in item.get("failure_reasons",[])
+            ]
+
+            hypotheses[idx].failure_prediction = FailurePrediction(
+                failure_risk_score     = round(risk_score, 3),
+                failure_risk_label     = risk_label,
+                failure_risk_color     = risk_colors.get(risk_label,"#64748b"),
+                failure_reasons        = reasons,
+                top_failure_reason     = item.get("top_failure_reason",""),
+                historical_context     = item.get("historical_context",""),
+                success_probability    = success_prob,
+                recommended_safeguards = item.get("recommended_safeguards",[])
+            )
+
+            hyp = hypotheses[idx]
+            print(f"   • {hyp.title[:45]}...\n"
+                  f"     Failure risk: {risk_label} ({risk_score:.2f}) | "
+                  f"Success prob: {success_prob:.0%} | "
+                  f"Reasons: {len(reasons)}")
+
+    except Exception as e:
+        print(f"   ⚠️  Failure prediction error: {e}")
+        for hyp in hypotheses:
+            if not hyp.failure_prediction:
+                hyp.failure_prediction = _mock_failure_prediction(hyp)
+
+    return hypotheses
+
+
+def _get_drug_phase(drug_names, pipeline_result):
+    for name in drug_names:
+        for drug in pipeline_result.drugs:
+            if drug.drug_name.upper() == name.upper():
+                return str(drug.clinical_phase or "Unknown")
+    return "Unknown"
+
+
+def _get_drug_risk(drug_names, pipeline_result):
+    for name in drug_names:
+        for drug in pipeline_result.drugs:
+            if drug.drug_name.upper() == name.upper():
+                return drug.risk_level
+    return "Unknown"
+
+
+def _mock_failure_prediction(hyp):
+    from backend.models.schemas import FailurePrediction, FailureReason
+    drug    = hyp.key_drugs[0] if hyp.key_drugs else "the compound"
+    protein = hyp.key_proteins[0] if hyp.key_proteins else "the target"
+    return FailurePrediction(
+        failure_risk_score   = 0.45,
+        failure_risk_label   = "Medium",
+        failure_risk_color   = "#f59e0b",
+        top_failure_reason   = f"Pathway redundancy may limit {drug}'s efficacy.",
+        historical_context   = "Multiple drugs targeting similar pathways failed Phase 3 due to insufficient efficacy.",
+        success_probability  = 0.45,
+        failure_reasons      = [
+            FailureReason(
+                category="Efficacy",reason="Biomarker improvement may not translate to clinical benefit",
+                severity="High",evidence="Historical precedent in similar drug class",
+                mitigation="Include cognitive endpoints alongside biomarker measures"
+            ),
+            FailureReason(
+                category="Mechanism",reason=f"Pathway redundancy around {protein} target",
+                severity="Medium",evidence="Known compensatory pathways in literature",
+                mitigation="Consider combination therapy approach"
+            ),
+            FailureReason(
+                category="Safety",reason="Long-term safety profile not fully established",
+                severity="Medium",evidence="Limited long-term follow-up data",
+                mitigation="Design extended safety monitoring protocol"
+            )
+        ],
+        recommended_safeguards=[
+            "Include biomarker + clinical cognitive endpoints",
+            "Design adaptive trial with interim analysis",
+            "Monitor for pathway compensation in pre-clinical models",
+            "Establish clear stopping rules for safety signals"
+        ]
+    )
+
+
+def generate_evidence_explanation(hypothesis, detail_level="scientist"):
+    if client is None:
+        return hypothesis.explanation
+    prompt = (
+        f"Explain simply with analogy in 3-4 sentences.\n"
+        f"Hypothesis: {hypothesis.title}\nContext: {hypothesis.explanation[:300]}"
+        if detail_level == "simple"
+        else
+        f"Expand with molecular pathway, validation, implications, limitations. 4-5 sentences.\n"
+        f"Hypothesis: {hypothesis.title}\nContext: {hypothesis.explanation[:300]}"
+    )
+    try:
+        response = client.chat.completions.create(
+            model=LLM_MODEL,
+            messages=[{"role":"system","content":SYSTEM_PROMPT},{"role":"user","content":prompt}],
+            temperature=0.3, max_tokens=400,
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        return f"Explanation unavailable: {str(e)}"
+
+
+# ── 7. Main Generation Function ───────────────────────────────
 
 def generate_hypotheses(
     pipeline_result: DiseaseAnalysisResult,
     num_hypotheses:  int = 3
-) -> list[Hypothesis]:
-    """Generate hypotheses via LLM then rank them."""
+) -> list:
+    """Generate hypotheses via LLM then run all 7 analysis stages."""
 
     if LLM_PROVIDER == "mock" or client is None:
         print("   ℹ️  Using mock hypotheses (no LLM key configured)")
         hypotheses = get_mock_hypotheses(pipeline_result.disease_name)
-        return rank_hypotheses(hypotheses, pipeline_result)
+        ranked = rank_hypotheses(hypotheses, pipeline_result)
+        ranked = add_causal_analysis(ranked, pipeline_result)
+        ranked = generate_validation_suggestions(ranked, pipeline_result)
+        ranked = generate_hypothesis_critiques(ranked, pipeline_result)
+        ranked = add_hypothesis_uncertainty(ranked, pipeline_result)
+        ranked = add_hypothesis_go_no_go(ranked, pipeline_result)
+        ranked = generate_failure_predictions(ranked, pipeline_result)
+        return ranked
 
     evidence_context = build_llm_context(pipeline_result)
     user_prompt = HYPOTHESIS_PROMPT_TEMPLATE.format(
@@ -892,13 +898,12 @@ def generate_hypotheses(
 
     try:
         response = client.chat.completions.create(
-            model       = LLM_MODEL,
-            messages    = [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user",   "content": user_prompt}
+            model=LLM_MODEL,
+            messages=[
+                {"role":"system","content":SYSTEM_PROMPT},
+                {"role":"user","content":user_prompt}
             ],
-            temperature = 0.4,
-            max_tokens  = 3000,
+            temperature=0.4, max_tokens=3000,
         )
         raw_response = response.choices[0].message.content.strip()
         print(f"   ✅ LLM responded ({len(raw_response)} chars)")
@@ -909,17 +914,14 @@ def generate_hypotheses(
         print("   ℹ️  Falling back to mock hypotheses")
         hypotheses = get_mock_hypotheses(pipeline_result.disease_name)
 
-    # ── Stage 1: Rank ─────────────────────────────────────────
+    # ── All 7 stages ──────────────────────────────────────────
     ranked = rank_hypotheses(hypotheses, pipeline_result)
-
-    # ── Stage 2: Causal analysis ──────────────────────────────
     ranked = add_causal_analysis(ranked, pipeline_result)
-
-    # ── Stage 3: Experimental validation ─────────────────────
     ranked = generate_validation_suggestions(ranked, pipeline_result)
-
-    # ── Stage 4: Critical evaluation ─────────────────────────
     ranked = generate_hypothesis_critiques(ranked, pipeline_result)
+    ranked = add_hypothesis_uncertainty(ranked, pipeline_result)
+    ranked = add_hypothesis_go_no_go(ranked, pipeline_result)
+    ranked = generate_failure_predictions(ranked, pipeline_result)
 
     return ranked
 
@@ -928,7 +930,7 @@ def generate_hypotheses(
 if __name__ == "__main__":
     from backend.services.pipeline_service import run_data_pipeline
 
-    print("🧬 AI Scientist V2 — Ranking Engine Test")
+    print("🧬 AI Scientist V4 — Full Pipeline Test")
     print("=" * 55)
 
     pipeline_result = run_data_pipeline(
@@ -944,12 +946,14 @@ if __name__ == "__main__":
     print("📊 RANKED HYPOTHESES")
     print("=" * 55)
 
-    medals = {1: "🥇", 2: "🥈", 3: "🥉"}
+    medals = {1:"🥇",2:"🥈",3:"🥉"}
     for h in hypotheses:
         medal = medals.get(h.rank, f"#{h.rank}")
+        gng   = h.go_no_go
+        fp    = h.failure_prediction
         print(f"\n{medal} Rank {h.rank} — Final Score: {h.final_score:.4f}")
-        print(f"   Title      : {h.title}")
-        print(f"   Confidence : {h.confidence_score} ({h.confidence_label})")
-        print(f"   Proteins   : {', '.join(h.key_proteins)}")
-        print(f"   Drugs      : {', '.join(h.key_drugs)}")
-        print(f"   Breakdown  : {h.score_breakdown}")
+        print(f"   Title       : {h.title}")
+        print(f"   Confidence  : {h.confidence_score} ({h.confidence_label})")
+        print(f"   Decision    : {gng.decision_emoji} {gng.decision}" if gng else "   Decision: N/A")
+        print(f"   Failure Risk: {fp.failure_risk_label} | Success: {fp.success_probability:.0%}" if fp else "   Failure: N/A")
+        print(f"   Breakdown   : {h.score_breakdown}")

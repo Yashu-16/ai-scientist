@@ -226,6 +226,13 @@ def render_hypothesis_card(hyp: dict, data: dict, expanded: bool = False):
         f"{medal} Rank {rank} | Score: {display:.0%}{causal_tag} | {hyp['title']}",
         expanded=expanded
     ):
+
+        # ── GO/NO-GO Badge ────────────────────────────────────
+        gng = hyp.get("go_no_go") or {}
+        if gng:
+            render_go_no_go_badge(gng, size="large")
+            st.markdown("---")
+
         # Score breakdown
         st.markdown("**📊 Ranking Score Breakdown**")
         bc1,bc2,bc3,bc4,bc5 = st.columns(5)
@@ -321,6 +328,16 @@ def render_hypothesis_card(hyp: dict, data: dict, expanded: bool = False):
         cr = hyp.get("critique") or {}
         if cr:
             render_hypothesis_critique(cr)
+
+        # ── Failure Prediction ────────────────────────────────
+        fp = hyp.get("failure_prediction") or {}
+        if fp:
+            render_failure_prediction(fp)
+
+        # ── Uncertainty Analysis ──────────────────────────────
+        unc = hyp.get("uncertainty") or {}
+        if unc:
+            render_uncertainty_indicator(unc, compact=False)
 
 def render_validation_suggestion(vs: dict):
     """Render experimental validation suggestion inside hypothesis card."""
@@ -535,6 +552,413 @@ def render_hypothesis_critique(critique: dict):
             f"<div style='font-size:13px;color:#bbf7d0;"
             f"line-height:1.6;'>{salvage}</div>"
             f"</div>",
+            unsafe_allow_html=True
+        )
+
+def render_uncertainty_indicator(uncertainty: dict,
+                                  compact: bool = False):
+    """Render uncertainty indicator for a hypothesis or analysis."""
+    if not uncertainty:
+        return
+
+    score  = float(uncertainty.get("uncertainty_score") or 0)
+    label  = str(uncertainty.get("uncertainty_label") or "Unknown")
+    color  = str(uncertainty.get("uncertainty_color") or "#64748b")
+    reason = str(uncertainty.get("uncertainty_reason") or "")
+    note   = str(uncertainty.get("reliability_note") or "")
+    factors= uncertainty.get("factors") or []
+
+    emoji  = {
+        "Low":      "✅",
+        "Medium":   "⚠️",
+        "High":     "🔶",
+        "Very High":"❌"
+    }.get(label, "❓")
+
+    if compact:
+        # Compact version for comparison table / summary
+        st.markdown(
+            f"<span style='background:{color}22;color:{color};"
+            f"padding:3px 10px;border-radius:12px;font-size:12px;"
+            f"font-weight:700;'>{emoji} {label} Uncertainty</span>",
+            unsafe_allow_html=True
+        )
+        return
+
+    # Full version for hypothesis card
+    st.markdown("**📐 Uncertainty & Reliability**")
+
+    # Header
+    col_u1, col_u2 = st.columns([1, 2])
+    with col_u1:
+        st.markdown(
+            f"<div style='background:{color}15;"
+            f"border:2px solid {color}44;"
+            f"border-radius:12px;padding:16px;"
+            f"text-align:center;'>"
+            f"<div style='font-size:28px;'>{emoji}</div>"
+            f"<div style='color:{color};font-weight:800;"
+            f"font-size:18px;margin-top:6px;'>{label}</div>"
+            f"<div style='color:#64748b;font-size:12px;"
+            f"margin-top:4px;'>Uncertainty</div>"
+            f"<div style='color:{color};font-size:22px;"
+            f"font-weight:700;margin-top:6px;'>"
+            f"{score:.0%}</div>"
+            f"</div>",
+            unsafe_allow_html=True
+        )
+
+    with col_u2:
+        st.markdown(
+            f"<div style='background:#0f172a;border-radius:8px;"
+            f"padding:12px;font-size:13px;color:#cbd5e1;"
+            f"line-height:1.7;margin-bottom:8px;'>{reason}</div>",
+            unsafe_allow_html=True
+        )
+        st.markdown(
+            f"<div style='background:#0a1f0a;"
+            f"border:1px solid #166534;"
+            f"border-radius:8px;padding:10px;font-size:12px;"
+            f"color:#bbf7d0;'>"
+            f"💡 <strong>To reduce uncertainty:</strong> {note}"
+            f"</div>",
+            unsafe_allow_html=True
+        )
+
+    # Factors breakdown
+    if factors:
+        st.markdown("**Contributing Factors:**")
+        for factor in factors:
+            f_impact = factor.get("impact","")
+            f_color  = {
+                "High":   "#ef4444",
+                "Medium": "#f59e0b",
+                "Low":    "#22c55e"
+            }.get(f_impact, "#64748b")
+            f_emoji  = {
+                "High":"🔴","Medium":"🟡","Low":"🟢"
+            }.get(f_impact,"⚪")
+
+            st.markdown(
+                f"<div style='background:#0f172a;"
+                f"border-left:3px solid {f_color};"
+                f"padding:6px 12px;margin:3px 0;"
+                f"border-radius:0 6px 6px 0;'>"
+                f"<span style='color:{f_color};font-weight:700;"
+                f"font-size:12px;'>{f_emoji} {factor.get('factor','')}: "
+                f"{f_impact}</span>"
+                f"<span style='color:#64748b;font-size:11px;"
+                f"margin-left:8px;'>{factor.get('description','')[:80]}"
+                f"</span></div>",
+                unsafe_allow_html=True
+            )
+
+    # Data quality flags
+    flags_html = []
+    flag_map = [
+        ("low_paper_count",    "🔴 Low paper count"),
+        ("weak_protein_assoc", "🔴 Weak protein association"),
+        ("high_fda_risk",      "🔴 High FDA risk"),
+        ("no_causal_evidence", "🟡 No causal evidence"),
+        ("limited_drug_data",  "🟡 Limited drug data"),
+    ]
+    for key, label_text in flag_map:
+        if uncertainty.get(key):
+            flags_html.append(
+                f"<span style='background:#1a1a2e;color:#94a3b8;"
+                f"padding:2px 8px;border-radius:8px;"
+                f"font-size:11px;margin:2px;display:inline-block;'>"
+                f"{label_text}</span>"
+            )
+
+    if flags_html:
+        st.markdown(
+            "<div style='margin-top:8px;'>" +
+            "".join(flags_html) + "</div>",
+            unsafe_allow_html=True
+        )
+
+def render_go_no_go_badge(gng: dict, size: str = "large"):
+    """
+    Render GO/NO-GO decision badge.
+    size: 'large' (full card) or 'compact' (inline badge)
+    """
+    if not gng:
+        return
+
+    decision   = str(gng.get("decision") or "")
+    color      = str(gng.get("decision_color") or "#64748b")
+    emoji      = str(gng.get("decision_emoji") or "❓")
+    conf       = float(gng.get("confidence_in_decision") or 0)
+    primary    = str(gng.get("primary_reason") or "")
+    action     = str(gng.get("recommended_action") or "")
+    flip       = str(gng.get("conditions_to_flip") or "")
+    supporting = gng.get("supporting_reasons") or []
+    blocking   = gng.get("blocking_reasons") or []
+
+    if size == "compact":
+        st.markdown(
+            f"<span style='background:{color};color:white;"
+            f"padding:4px 14px;border-radius:20px;"
+            f"font-size:13px;font-weight:800;"
+            f"letter-spacing:1px;'>{emoji} {decision}</span>",
+            unsafe_allow_html=True
+        )
+        return
+
+    # Large version — full decision card
+    bg_gradient = {
+        "GO":          "linear-gradient(135deg,#052e16,#0a3d1f)",
+        "NO-GO":       "linear-gradient(135deg,#2d0a0a,#3d1010)",
+        "INVESTIGATE": "linear-gradient(135deg,#1c1202,#2d1f02)"
+    }.get(decision, "linear-gradient(135deg,#0f172a,#1e293b)")
+
+    st.markdown(
+        f"<div style='background:{bg_gradient};"
+        f"border:2px solid {color}55;"
+        f"border-radius:14px;padding:20px 24px;margin:8px 0;'>"
+
+        # Decision header
+        f"<div style='display:flex;align-items:center;"
+        f"justify-content:space-between;margin-bottom:14px;'>"
+        f"<div style='display:flex;align-items:center;gap:12px;'>"
+        f"<div style='font-size:36px;'>{emoji}</div>"
+        f"<div>"
+        f"<div style='font-size:11px;color:#94a3b8;"
+        f"text-transform:uppercase;letter-spacing:2px;"
+        f"font-weight:700;'>Final Decision</div>"
+        f"<div style='font-size:28px;font-weight:900;"
+        f"color:{color};letter-spacing:2px;'>{decision}</div>"
+        f"</div></div>"
+        f"<div style='text-align:right;'>"
+        f"<div style='color:#64748b;font-size:11px;'>Decision confidence</div>"
+        f"<div style='color:{color};font-size:24px;"
+        f"font-weight:700;'>{conf:.0%}</div>"
+        f"</div></div>"
+
+        # Primary reason
+        f"<div style='background:rgba(0,0,0,0.3);"
+        f"border-radius:8px;padding:12px;margin-bottom:12px;"
+        f"font-size:13px;color:#e2e8f0;line-height:1.6;'>"
+        f"<strong style='color:{color};'>📋 Decision Basis: </strong>"
+        f"{primary}</div>"
+
+        f"</div>",
+        unsafe_allow_html=True
+    )
+
+    # Supporting and blocking in columns
+    if supporting or blocking:
+        col_s, col_b = st.columns(2)
+
+        with col_s:
+            if supporting:
+                st.markdown(
+                    "<div style='color:#22c55e;font-size:11px;"
+                    "font-weight:700;text-transform:uppercase;"
+                    "letter-spacing:1px;margin-bottom:6px;'>"
+                    "✅ Supporting Factors</div>",
+                    unsafe_allow_html=True
+                )
+                for s in supporting:
+                    st.markdown(
+                        f"<div style='background:#052e1688;"
+                        f"border-left:3px solid #22c55e;"
+                        f"padding:6px 10px;margin:3px 0;"
+                        f"border-radius:0 6px 6px 0;"
+                        f"font-size:12px;color:#86efac;'>"
+                        f"• {s}</div>",
+                        unsafe_allow_html=True
+                    )
+
+        with col_b:
+            if blocking:
+                st.markdown(
+                    "<div style='color:#ef4444;font-size:11px;"
+                    "font-weight:700;text-transform:uppercase;"
+                    "letter-spacing:1px;margin-bottom:6px;'>"
+                    "❌ Blocking Factors</div>",
+                    unsafe_allow_html=True
+                )
+                for b in blocking:
+                    st.markdown(
+                        f"<div style='background:#2d0a0a88;"
+                        f"border-left:3px solid #ef4444;"
+                        f"padding:6px 10px;margin:3px 0;"
+                        f"border-radius:0 6px 6px 0;"
+                        f"font-size:12px;color:#fca5a5;'>"
+                        f"• {b}</div>",
+                        unsafe_allow_html=True
+                    )
+
+    # Action + flip condition
+    if action:
+        st.markdown(
+            f"<div style='background:#0f1f0f;"
+            f"border:1px solid #16653488;"
+            f"border-radius:8px;padding:10px 14px;margin-top:8px;'>"
+            f"<span style='color:#4ade80;font-size:11px;"
+            f"font-weight:700;text-transform:uppercase;"
+            f"letter-spacing:1px;'>🚀 Recommended Action: </span>"
+            f"<span style='font-size:13px;color:#bbf7d0;'>{action}</span>"
+            f"</div>",
+            unsafe_allow_html=True
+        )
+
+    if flip:
+        st.markdown(
+            f"<div style='background:#111827;"
+            f"border-radius:8px;padding:8px 14px;margin-top:6px;'>"
+            f"<span style='color:#64748b;font-size:11px;'>"
+            f"🔄 <em>{flip}</em></span>"
+            f"</div>",
+            unsafe_allow_html=True
+        )
+
+def render_failure_prediction(fp: dict):
+    """Render failure prediction section inside hypothesis card."""
+    if not fp:
+        return
+
+    risk_score  = float(fp.get("failure_risk_score") or 0)
+    risk_label  = str(fp.get("failure_risk_label") or "Unknown")
+    risk_color  = str(fp.get("failure_risk_color") or "#64748b")
+    top_reason  = str(fp.get("top_failure_reason") or "")
+    hist_ctx    = str(fp.get("historical_context") or "")
+    success_p   = float(fp.get("success_probability") or 0)
+    reasons     = fp.get("failure_reasons") or []
+    safeguards  = fp.get("recommended_safeguards") or []
+
+    risk_emoji  = {
+        "Low":       "🟢",
+        "Medium":    "🟡",
+        "High":      "🔶",
+        "Very High": "🔴"
+    }.get(risk_label, "❓")
+
+    st.markdown("**⚠️ Failure Prediction Analysis**")
+
+    # Header row
+    col_f1, col_f2, col_f3 = st.columns([1, 1, 2])
+
+    with col_f1:
+        st.markdown(
+            f"<div style='background:{risk_color}15;"
+            f"border:2px solid {risk_color}44;"
+            f"border-radius:10px;padding:14px;text-align:center;'>"
+            f"<div style='font-size:11px;color:#94a3b8;"
+            f"text-transform:uppercase;letter-spacing:1px;"
+            f"margin-bottom:6px;'>Failure Risk</div>"
+            f"<div style='font-size:24px;'>{risk_emoji}</div>"
+            f"<div style='color:{risk_color};font-weight:800;"
+            f"font-size:16px;margin-top:4px;'>{risk_label}</div>"
+            f"<div style='color:#64748b;font-size:13px;"
+            f"margin-top:2px;'>{risk_score:.0%}</div>"
+            f"</div>",
+            unsafe_allow_html=True
+        )
+
+    with col_f2:
+        # Success probability gauge
+        sp_color = confidence_color(success_p)
+        st.markdown(
+            f"<div style='background:#0f172a;"
+            f"border:1px solid #1e293b;"
+            f"border-radius:10px;padding:14px;text-align:center;'>"
+            f"<div style='font-size:11px;color:#94a3b8;"
+            f"text-transform:uppercase;letter-spacing:1px;"
+            f"margin-bottom:6px;'>Success Probability</div>"
+            f"<div style='color:{sp_color};font-weight:800;"
+            f"font-size:28px;'>{success_p:.0%}</div>"
+            f"<div style='color:#64748b;font-size:11px;'>"
+            f"estimated</div>"
+            f"</div>",
+            unsafe_allow_html=True
+        )
+
+    with col_f3:
+        if top_reason:
+            st.markdown(
+                f"<div style='background:#1a0d0d;"
+                f"border-left:3px solid {risk_color};"
+                f"border-radius:0 8px 8px 0;"
+                f"padding:12px;height:100%;'>"
+                f"<div style='color:{risk_color};font-size:11px;"
+                f"font-weight:700;text-transform:uppercase;"
+                f"letter-spacing:1px;margin-bottom:6px;'>"
+                f"Top Failure Mode</div>"
+                f"<div style='color:#fca5a5;font-size:13px;"
+                f"line-height:1.5;'>{top_reason}</div>"
+                f"</div>",
+                unsafe_allow_html=True
+            )
+
+    # Historical context
+    if hist_ctx:
+        st.markdown(
+            f"<div style='background:#0f172a;"
+            f"border-radius:8px;padding:10px 14px;margin:8px 0;"
+            f"font-size:12px;color:#94a3b8;line-height:1.6;'>"
+            f"<strong style='color:#60a5fa;'>📚 Historical Context: </strong>"
+            f"{hist_ctx}</div>",
+            unsafe_allow_html=True
+        )
+
+    # Failure reasons grid
+    if reasons:
+        st.markdown("**Predicted Failure Reasons:**")
+        cat_colors = {
+            "Safety":      "#ef4444",
+            "Efficacy":    "#f59e0b",
+            "Mechanism":   "#8b5cf6",
+            "Trial Design":"#3b82f6",
+            "Market":      "#10b981"
+        }
+        for r in reasons[:4]:
+            cat   = r.get("category","")
+            sev   = r.get("severity","Medium")
+            c_col = cat_colors.get(cat, "#64748b")
+            sev_badge = {
+                "High":   "🔴 High",
+                "Medium": "🟡 Med",
+                "Low":    "🟢 Low"
+            }.get(sev, sev)
+
+            with st.expander(
+                f"[{cat}] {r.get('reason','')[:60]}... "
+                f"— {sev_badge}"
+            ):
+                col_r1, col_r2 = st.columns(2)
+                with col_r1:
+                    st.markdown(
+                        f"<div style='font-size:12px;color:#94a3b8;"
+                        f"margin-bottom:4px;'><strong style='color:{c_col};'>"
+                        f"Evidence:</strong> {r.get('evidence','')}</div>",
+                        unsafe_allow_html=True
+                    )
+                with col_r2:
+                    st.markdown(
+                        f"<div style='font-size:12px;color:#86efac;'>"
+                        f"<strong>Mitigation:</strong> "
+                        f"{r.get('mitigation','')}</div>",
+                        unsafe_allow_html=True
+                    )
+
+    # Safeguards
+    if safeguards:
+        st.markdown(
+            "<div style='background:#0f1f0f;"
+            "border:1px solid #166534;"
+            "border-radius:8px;padding:12px 14px;margin-top:8px;'>"
+            "<div style='color:#4ade80;font-size:11px;font-weight:700;"
+            "text-transform:uppercase;letter-spacing:1px;"
+            "margin-bottom:6px;'>🛡️ Recommended Safeguards</div>" +
+            "".join([
+                f"<div style='color:#bbf7d0;font-size:12px;"
+                f"margin:3px 0;'>• {sg}</div>"
+                for sg in safeguards[:4]
+            ]) +
+            "</div>",
             unsafe_allow_html=True
         )
 
@@ -830,10 +1254,13 @@ def render_comparison_table(data: dict):
         })
 
     # Header
-    h1,h2,h3,h4,h5,h6,h7 = st.columns([0.5,3.0,1.2,1.2,1.0,1.2,1.0])
-    for col,lbl in zip([h1,h2,h3,h4,h5,h6,h7],
+    h1,h2,h3,h4,h5,h6,h7,h8,h9 = st.columns(
+        [0.5,2.5,1.0,1.0,0.8,1.0,0.8,1.0,1.0]
+    )
+    for col,lbl in zip([h1,h2,h3,h4,h5,h6,h7,h8,h9],
                        ["Rank","Hypothesis","Proteins",
-                        "Drugs","Score","Causal","Risk"]):
+                        "Drugs","Score","Causal","Risk",
+                        "Uncertainty","Decision"]):
         col.markdown(
             f"<div style='color:#64748b;font-size:11px;"
             f"font-weight:700;text-transform:uppercase;"
@@ -844,7 +1271,9 @@ def render_comparison_table(data: dict):
                 "#1e293b;margin:4px 0;'>", unsafe_allow_html=True)
 
     for row in table_rows:
-        c1,c2,c3,c4,c5,c6,c7 = st.columns([0.5,3.0,1.2,1.2,1.0,1.2,1.0])
+        c1,c2,c3,c4,c5,c6,c7,c8,c9 = st.columns(
+            [0.5,2.5,1.0,1.0,0.8,1.0,0.8,1.0,1.0]
+        )
         with c1:
             st.markdown(
                 f"<div style='font-size:22px;text-align:center;"
@@ -919,6 +1348,49 @@ def render_comparison_table(data: dict):
                 f"font-weight:600;text-align:center;margin-top:4px;'>"
                 f"{row['risk_emoji']} {row['risk']}</div>",
                 unsafe_allow_html=True)
+
+        with c8:
+            unc = {}
+            for hyp_data in data["hypotheses"]:
+                if hyp_data.get("rank") == row["rank"]:
+                    unc = hyp_data.get("uncertainty") or {}
+                    break
+            if unc:
+                u_label = unc.get("uncertainty_label","")
+                u_color = unc.get("uncertainty_color","#64748b")
+                u_emoji = {"Low":"✅","Medium":"⚠️",
+                           "High":"🔶","Very High":"❌"
+                           }.get(u_label,"❓")
+                st.markdown(
+                    f"<div style='background:{u_color}22;"
+                    f"color:{u_color};padding:4px 8px;"
+                    f"border-radius:8px;font-size:11px;"
+                    f"font-weight:600;text-align:center;"
+                    f"margin-top:4px;'>"
+                    f"{u_emoji} {u_label}</div>",
+                    unsafe_allow_html=True
+                )
+
+        with c9:
+            gng = {}
+            for hyp_data in data["hypotheses"]:
+                if hyp_data.get("rank") == row["rank"]:
+                    gng = hyp_data.get("go_no_go") or {}
+                    break
+            if gng:
+                g_dec   = gng.get("decision","")
+                g_color = gng.get("decision_color","#64748b")
+                g_emoji = gng.get("decision_emoji","❓")
+                st.markdown(
+                    f"<div style='background:{g_color}22;"
+                    f"color:{g_color};border:1px solid {g_color}55;"
+                    f"padding:4px 8px;border-radius:8px;"
+                    f"font-size:12px;font-weight:800;"
+                    f"text-align:center;margin-top:4px;"
+                    f"letter-spacing:1px;'>"
+                    f"{g_emoji} {g_dec}</div>",
+                    unsafe_allow_html=True
+                )
         st.markdown("<hr style='border:none;border-top:1px solid "
                     "#0f172a;margin:2px 0;'>", unsafe_allow_html=True)
 
@@ -1336,6 +1808,63 @@ elif analyze_clicked and disease_input.strip():
             unsafe_allow_html=True
         )
 
+    # ── Analysis Uncertainty Banner ───────────────────────────
+    au = data.get("analysis_uncertainty") or {}
+    if au:
+        au_score = float(au.get("uncertainty_score") or 0)
+        au_label = str(au.get("uncertainty_label") or "Unknown")
+        au_color = str(au.get("uncertainty_color") or "#64748b")
+        au_reason= str(au.get("uncertainty_reason") or "")
+        au_emoji = {"Low":"✅","Medium":"⚠️",
+                    "High":"🔶","Very High":"❌"}.get(au_label,"❓")
+
+        # Flags row
+        flag_items = []
+        flag_checks = [
+            ("low_paper_count",    "Low Paper Count"),
+            ("weak_protein_assoc", "Weak Protein Assoc."),
+            ("high_fda_risk",      "High FDA Risk"),
+            ("no_causal_evidence", "No Causal Evidence"),
+            ("limited_drug_data",  "Limited Drug Data"),
+        ]
+        for key, lbl in flag_checks:
+            if au.get(key):
+                flag_items.append(
+                    f"<span style='background:#2d1a1a;"
+                    f"color:#f87171;padding:2px 8px;"
+                    f"border-radius:8px;font-size:11px;"
+                    f"margin:2px;display:inline-block;'>"
+                    f"⚠️ {lbl}</span>"
+                )
+
+        flags_html = "".join(flag_items) if flag_items else (
+            "<span style='color:#22c55e;font-size:11px;'>"
+            "✅ No critical uncertainty flags</span>"
+        )
+
+        st.markdown(
+            f"<div style='background:{au_color}0d;"
+            f"border:1px solid {au_color}44;"
+            f"border-radius:10px;padding:14px 20px;margin:8px 0;'>"
+            f"<div style='display:flex;justify-content:space-between;"
+            f"align-items:center;margin-bottom:8px;'>"
+            f"<div>"
+            f"<span style='font-size:11px;color:#94a3b8;"
+            f"text-transform:uppercase;letter-spacing:1px;'>"
+            f"Analysis Reliability</span>"
+            f"<div style='margin-top:3px;'>"
+            f"<span style='font-size:18px;font-weight:800;"
+            f"color:{au_color};'>{au_emoji} {au_label} Uncertainty</span>"
+            f"<span style='color:#64748b;font-size:13px;"
+            f"margin-left:10px;'>Score: {au_score:.2f}/1.00</span>"
+            f"</div></div></div>"
+            f"<div style='font-size:12px;color:#94a3b8;"
+            f"margin-bottom:8px;'>{au_reason}</div>"
+            f"<div>{flags_html}</div>"
+            f"</div>",
+            unsafe_allow_html=True
+        )
+
     st.divider()
 
     # ── Decision Summary Panel ────────────────────────────────
@@ -1422,6 +1951,13 @@ elif analyze_clicked and disease_input.strip():
                 f"<div style='font-size:22px;font-weight:800;"
                 f"color:{risk_col};'>{risk_emoji} {risk}</div></div>",
                 unsafe_allow_html=True)
+
+        # ── GO/NO-GO Badge ────────────────────────────────────
+        gng = ds.get("go_no_go") or {}
+        if gng:
+            render_go_no_go_badge(gng, size="large")
+        st.markdown("<div style='margin-top:8px;'></div>",
+                    unsafe_allow_html=True)
 
         st.markdown("<div style='margin-top:10px;'></div>",
                     unsafe_allow_html=True)

@@ -19,7 +19,8 @@ from backend.models.schemas import (
     Drug,
     FDAAdverseEvent,
     ResearchPaper,
-    EvidenceStrength
+    EvidenceStrength,
+    UncertaintyAnalysis   
 )
 
 
@@ -329,6 +330,234 @@ def compute_decision_summary(
         evidence_basis   = evidence_basis
     )
 
+def compute_uncertainty(
+    result: "DiseaseAnalysisResult",
+    hypothesis=None
+) -> "UncertaintyAnalysis":
+    """
+    Compute uncertainty score for a pipeline result or hypothesis.
+
+    Uncertainty is HIGH when:
+    - Few supporting papers (<3)
+    - Weak protein association scores
+    - High FDA risk signals present
+    - No causal evidence found
+    - Limited drug data
+
+    Uncertainty is LOW when:
+    - Many papers (>8) with good citations
+    - Strong protein associations (>0.8)
+    - Low/Medium FDA risk
+    - Causal evidence present
+    - Multiple drugs found
+
+    Args:
+        result     : Full pipeline result (for analysis-level uncertainty)
+        hypothesis : Optional specific hypothesis (for hypothesis-level)
+
+    Returns:
+        UncertaintyAnalysis object
+    """
+    from backend.models.schemas import UncertaintyAnalysis, UncertaintyFactor
+
+    factors        = []
+    uncertainty_raw= 0.0
+    flags          = {}
+
+    # ── Factor 1: Paper count ─────────────────────────────────
+    paper_count = len(result.papers)
+    if paper_count < 3:
+        paper_impact    = "High"
+        paper_penalty   = 0.35
+        flags["low_paper_count"] = True
+    elif paper_count < 6:
+        paper_impact    = "Medium"
+        paper_penalty   = 0.15
+        flags["low_paper_count"] = False
+    else:
+        paper_impact    = "Low"
+        paper_penalty   = 0.05
+        flags["low_paper_count"] = False
+
+    uncertainty_raw += paper_penalty
+    factors.append(UncertaintyFactor(
+        factor      = "Literature Support",
+        impact      = paper_impact,
+        description = (
+            f"{paper_count} papers retrieved. "
+            f"{'Insufficient evidence base.' if paper_count < 3 else 'Adequate.' if paper_count < 6 else 'Strong evidence base.'}"
+        )
+    ))
+
+    # ── Factor 2: Protein association strength ────────────────
+    if result.protein_targets:
+        top_score = result.protein_targets[0].association_score
+        if top_score < 0.6:
+            prot_impact  = "High"
+            prot_penalty = 0.30
+            flags["weak_protein_assoc"] = True
+        elif top_score < 0.75:
+            prot_impact  = "Medium"
+            prot_penalty = 0.15
+            flags["weak_protein_assoc"] = False
+        else:
+            prot_impact  = "Low"
+            prot_penalty = 0.05
+            flags["weak_protein_assoc"] = False
+
+        uncertainty_raw += prot_penalty
+        factors.append(UncertaintyFactor(
+            factor      = "Protein Association Strength",
+            impact      = prot_impact,
+            description = (
+                f"Top protein score: {top_score:.3f}. "
+                f"{'Weak association — high uncertainty.' if top_score < 0.6 else 'Moderate association.' if top_score < 0.75 else 'Strong association — low uncertainty.'}"
+            )
+        ))
+
+    # ── Factor 3: FDA risk signals ────────────────────────────
+    high_risk_drugs = [
+        d for d in result.drugs if d.risk_level == "High"
+    ]
+    if high_risk_drugs:
+        risk_impact  = "High"
+        risk_penalty = 0.20
+        flags["high_fda_risk"] = True
+        risk_desc = (
+            f"{len(high_risk_drugs)} high-risk drug(s) detected: "
+            f"{', '.join(d.drug_name for d in high_risk_drugs[:2])}. "
+            f"Significant adverse event signals increase uncertainty."
+        )
+    else:
+        risk_impact  = "Low"
+        risk_penalty = 0.0
+        flags["high_fda_risk"] = False
+        risk_desc = "No high-risk FDA signals detected."
+
+    uncertainty_raw += risk_penalty
+    factors.append(UncertaintyFactor(
+        factor      = "FDA Risk Signals",
+        impact      = risk_impact,
+        description = risk_desc
+    ))
+
+    # ── Factor 4: Drug data availability ─────────────────────
+    drug_count = len(result.drugs)
+    if drug_count < 2:
+        drug_impact  = "High"
+        drug_penalty = 0.20
+        flags["limited_drug_data"] = True
+    elif drug_count < 4:
+        drug_impact  = "Medium"
+        drug_penalty = 0.10
+        flags["limited_drug_data"] = False
+    else:
+        drug_impact  = "Low"
+        drug_penalty = 0.0
+        flags["limited_drug_data"] = False
+
+    uncertainty_raw += drug_penalty
+    factors.append(UncertaintyFactor(
+        factor      = "Drug Evidence Coverage",
+        impact      = drug_impact,
+        description = (
+            f"{drug_count} drug-target associations found. "
+            f"{'Limited drug data reduces confidence.' if drug_count < 2 else 'Adequate drug coverage.'}"
+        )
+    ))
+
+    # ── Factor 5: Causal evidence (hypothesis-specific) ──────
+    if hypothesis and hasattr(hypothesis, 'causal_analysis') \
+       and hypothesis.causal_analysis:
+        causal_score = hypothesis.causal_analysis.causal_score
+        if causal_score < 0.2:
+            causal_impact  = "High"
+            causal_penalty = 0.20
+            flags["no_causal_evidence"] = True
+        elif causal_score < 0.5:
+            causal_impact  = "Medium"
+            causal_penalty = 0.10
+            flags["no_causal_evidence"] = False
+        else:
+            causal_impact  = "Low"
+            causal_penalty = 0.0
+            flags["no_causal_evidence"] = False
+
+        uncertainty_raw += causal_penalty
+        factors.append(UncertaintyFactor(
+            factor      = "Causal Evidence",
+            impact      = causal_impact,
+            description = (
+                f"Causal score: {causal_score:.2f}. "
+                f"{'Correlational only — mechanism unproven.' if causal_score < 0.2 else 'Some causal signals present.' if causal_score < 0.5 else 'Good causal evidence.'}"
+            )
+        ))
+    else:
+        flags["no_causal_evidence"] = True
+
+    # ── Normalize + Label ─────────────────────────────────────
+    uncertainty_score = round(min(1.0, uncertainty_raw), 4)
+
+    if uncertainty_score >= 0.7:
+        label = "Very High"
+        color = "#ef4444"
+        reason= (
+            "Multiple critical data gaps detected. "
+            "Hypothesis requires substantial additional validation "
+            "before drawing conclusions."
+        )
+        reliability_note = (
+            "Increase paper count, find stronger causal evidence, "
+            "and verify drug safety profile before proceeding."
+        )
+    elif uncertainty_score >= 0.45:
+        label = "High"
+        color = "#f97316"
+        reason= (
+            "Several uncertainty factors present. "
+            "Results are indicative but not definitive. "
+            "Additional validation recommended."
+        )
+        reliability_note = (
+            "Retrieve more papers, verify protein associations "
+            "experimentally, and check for conflicting studies."
+        )
+    elif uncertainty_score >= 0.25:
+        label = "Medium"
+        color = "#f59e0b"
+        reason= (
+            "Some uncertainty factors present but manageable. "
+            "Results are reasonably reliable for exploratory use."
+        )
+        reliability_note = (
+            "Consider expanding literature search and running "
+            "targeted validation experiments."
+        )
+    else:
+        label = "Low"
+        color = "#22c55e"
+        reason= (
+            "Strong evidence base with minimal uncertainty factors. "
+            "Results are reliable for decision-making purposes."
+        )
+        reliability_note = (
+            "Evidence is sufficient. Proceed with confidence "
+            "to experimental validation phase."
+        )
+
+    return UncertaintyAnalysis(
+        uncertainty_score  = uncertainty_score,
+        uncertainty_label  = label,
+        uncertainty_color  = color,
+        factors            = factors,
+        low_paper_count    = flags.get("low_paper_count", False),
+        weak_protein_assoc = flags.get("weak_protein_assoc", False),
+        high_fda_risk      = flags.get("high_fda_risk", False),
+        no_causal_evidence = flags.get("no_causal_evidence", True),
+        limited_drug_data  = flags.get("limited_drug_data", False),
+        uncertainty_reason = reason,
+        reliability_note   = reliability_note
+    )
 
 def run_data_pipeline(
     disease_name: str,
@@ -482,6 +711,15 @@ def run_data_pipeline(
     result.evidence_strength = compute_evidence_strength(result.papers)
     ev = result.evidence_strength
     print(f"   Evidence: {ev.evidence_label} (score: {ev.evidence_score})")
+
+    # ── Compute Analysis-Level Uncertainty ────────────────────
+    print("\n📐 Computing uncertainty analysis...")
+    result.analysis_uncertainty = compute_uncertainty(result)
+    ua = result.analysis_uncertainty
+    print(f"   Uncertainty: {ua.uncertainty_label} "
+          f"(score: {ua.uncertainty_score:.3f})")
+    for f in ua.factors:
+        print(f"   • {f.factor}: {f.impact} — {f.description[:60]}")
 
     result.analysis_status = "complete"
 

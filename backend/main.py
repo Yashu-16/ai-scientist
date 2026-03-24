@@ -651,6 +651,17 @@ def analyze_disease(request: AnalysisRequest):
         from backend.services.pipeline_service import compute_decision_summary
         pipeline_result.decision_summary = compute_decision_summary(pipeline_result)
 
+        # ── V4: GO/NO-GO for overall analysis ────────────────
+        from backend.services.decision_service import \
+            compute_analysis_go_no_go
+        if pipeline_result.decision_summary:
+            pipeline_result.decision_summary.go_no_go = \
+                compute_analysis_go_no_go(pipeline_result)
+            gng = pipeline_result.decision_summary.go_no_go
+            print(f"\n🚦 Overall Decision: "
+                  f"{gng.decision_emoji} {gng.decision} "
+                  f"({gng.confidence_in_decision:.0%} confident)")
+
         ds = pipeline_result.decision_summary
         print(f"\n🎯 Decision Summary:")
         print(f"   Drug       : {ds.recommended_drug}")

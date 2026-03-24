@@ -79,6 +79,8 @@ class DecisionSummary(BaseModel):
     reasoning_summary:  str   = ""   # 2-sentence actionable summary
     suggested_action:   str   = ""   # What to do next
     evidence_basis:     str   = ""   # What evidence supports this
+    # ── V4 Feature 2 ──────────────────────────────────────────
+    go_no_go: Optional["GoNoGoDecision"] = None
 
 # ── Causal Analysis ───────────────────────────────────────────
 class CausalEvidence(BaseModel):
@@ -134,6 +136,92 @@ class HypothesisCritique(BaseModel):
     salvage_suggestion: str       = ""   # How to strengthen the hypothesis
     critique_severity:  str       = ""   # "Minor" / "Moderate" / "Major"
     severity_color:     str       = ""   # Hex color
+
+# ── Uncertainty Analysis ──────────────────────────────────────
+class UncertaintyFactor(BaseModel):
+    """A single factor contributing to uncertainty."""
+    factor:      str   = ""    # What the factor is
+    impact:      str   = ""    # "High" / "Medium" / "Low"
+    description: str   = ""    # Why it matters
+
+
+class UncertaintyAnalysis(BaseModel):
+    """
+    Reliability assessment for a hypothesis or full analysis.
+    Measures HOW RELIABLE the confidence score is.
+
+    High confidence + Low uncertainty  = Strong result
+    High confidence + High uncertainty = Treat with caution
+    """
+    uncertainty_score:  float = 0.0   # 0.0 (certain) to 1.0 (uncertain)
+    uncertainty_label:  str   = ""    # "Low" / "Medium" / "High" / "Very High"
+    uncertainty_color:  str   = ""    # Hex color
+
+    # Contributing factors
+    factors:            List[UncertaintyFactor] = []
+
+    # Data quality flags
+    low_paper_count:    bool  = False  # <3 papers
+    weak_protein_assoc: bool  = False  # top protein score < 0.7
+    high_fda_risk:      bool  = False  # any High risk drug
+    no_causal_evidence: bool  = False  # causal score < 0.2
+    limited_drug_data:  bool  = False  # <2 drugs found
+
+    # Summary
+    uncertainty_reason: str   = ""    # Human-readable explanation
+    reliability_note:   str   = ""    # What would reduce uncertainty
+
+# ── GO/NO-GO Decision ─────────────────────────────────────────
+class GoNoGoDecision(BaseModel):
+    """
+    Final actionable GO/NO-GO decision for a hypothesis or analysis.
+    The single most important output of the entire platform.
+    """
+    decision:           str   = ""    # "GO" / "NO-GO" / "INVESTIGATE"
+    decision_color:     str   = ""    # Hex color
+    decision_emoji:     str   = ""    # ✅ / ❌ / 🔍
+    confidence_in_decision: float = 0.0  # 0.0–1.0
+
+    # Score components used
+    composite_score:    float = 0.0
+    uncertainty_score:  float = 0.0
+    risk_level:         str   = ""
+    evidence_label:     str   = ""
+
+    # Decision reasoning
+    primary_reason:     str   = ""    # Main reason for decision
+    supporting_reasons: List[str] = []
+    blocking_reasons:   List[str] = []  # Why NOT to go
+
+    # What to do next
+    recommended_action: str   = ""
+    conditions_to_flip: str   = ""    # What would change the decision
+
+# ── Failure Prediction ────────────────────────────────────────
+class FailureReason(BaseModel):
+    """A specific predicted failure reason."""
+    category:    str = ""   # "Safety" / "Efficacy" / "Mechanism" / "Trial"
+    reason:      str = ""   # Specific failure reason
+    severity:    str = ""   # "High" / "Medium" / "Low"
+    evidence:    str = ""   # What supports this prediction
+    mitigation:  str = ""   # How to address it
+
+
+class FailurePrediction(BaseModel):
+    """
+    Predicts why a hypothesis/drug might fail in development.
+    Based on historical failure patterns, safety signals, and
+    mechanism strength.
+    """
+    failure_risk_score:   float = 0.0  # 0.0 (low risk) to 1.0 (high risk)
+    failure_risk_label:   str   = ""   # "Low" / "Medium" / "High" / "Very High"
+    failure_risk_color:   str   = ""   # Hex color
+
+    failure_reasons:      List[FailureReason] = []
+    top_failure_reason:   str   = ""   # Single most likely failure mode
+    historical_context:   str   = ""   # Known failures in similar drug class
+    success_probability:  float = 0.0  # Estimated probability of success
+    recommended_safeguards: List[str] = []
 
 # ── Multi-Disease Comparison ──────────────────────────────────
 class DiseaseComparisonEntry(BaseModel):
@@ -218,6 +306,12 @@ class Hypothesis(BaseModel):
     validation_suggestion: Optional["ValidationSuggestion"] = None
     # Feature 5
     critique:              Optional["HypothesisCritique"]   = None
+    # Feature 5 (V4)
+    uncertainty: Optional["UncertaintyAnalysis"] = None
+    # V4 Feature 2
+    go_no_go:    Optional["GoNoGoDecision"]      = None
+    # V4 Feature 3
+    failure_prediction: Optional["FailurePrediction"]   = None
 
 
 # ── Full Analysis Result ──────────────────────────────────────
@@ -230,6 +324,8 @@ class DiseaseAnalysisResult(BaseModel):
     hypotheses:        List[Hypothesis]           = []
     evidence_strength: Optional[EvidenceStrength] = None
     decision_summary:  Optional[DecisionSummary]  = None
+    # V4 Feature 1
+    analysis_uncertainty: Optional["UncertaintyAnalysis"] = None
     analysis_status:   str                        = "pending"
     error_message:     str                        = ""
 
