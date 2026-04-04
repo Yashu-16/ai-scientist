@@ -257,6 +257,151 @@ def setup_scheduler(app):
         print(f"⚠️  Scheduler setup failed: {e}")
         return None
 
+# ── Trend Analysis Engine ─────────────────────────────────────
+
+# Keywords to track for trend detection
+TREND_KEYWORDS = {
+    "proteins": [
+        "APP","PSEN1","PSEN2","APOE","GRIN1","LRRK2","SNCA",
+        "BACE1","MAPT","GBA","PINK1","PARK7","TARDBP","FUS",
+        "BRCA1","BRCA2","HER2","EGFR","TP53","KRAS","PTEN",
+        "INS","INSR","GLP1R","PPARG","TCF7L2"
+    ],
+    "mechanisms": [
+        "amyloid","tau","neuroinflammation","autophagy","mitophagy",
+        "gamma-secretase","BACE","immunotherapy","gene therapy",
+        "CRISPR","antisense","RNA","nanoparticle","stem cell",
+        "checkpoint inhibitor","CAR-T","bispecific","ADC",
+        "GLP-1","SGLT2","insulin resistance","microbiome"
+    ],
+    "diseases": [
+        "Alzheimer","Parkinson","ALS","Huntington","multiple sclerosis",
+        "breast cancer","lung cancer","glioblastoma","leukemia","lymphoma",
+        "diabetes","obesity","NASH","cardiovascular","heart failure",
+        "rheumatoid arthritis","lupus","IBD","psoriasis"
+    ]
+}
+
+
+def analyze_trends() -> dict:
+    """
+    Analyze stored paper updates to detect trending entities.
+
+    Counts keyword mentions across all stored papers and
+    computes a simple growth/frequency score.
+
+    Returns:
+        {
+          "trending_proteins":   [...],
+          "trending_mechanisms": [...],
+          "trending_diseases":   [...],
+          "emerging_opportunities": [...],
+          "total_papers_analyzed": int,
+          "last_analyzed": str
+        }
+    """
+    all_updates = updates_store.get_updates()
+
+    # Flatten all paper titles + abstracts
+    all_text = []
+    total_papers = 0
+    for disease, papers in all_updates.items():
+        for paper in papers:
+            text = (
+                paper.get("title","") + " " +
+                paper.get("abstract","")
+            ).lower()
+            all_text.append({"text": text, "disease": disease})
+            total_papers += 1
+
+    if not all_text:
+        return {
+            "trending_proteins":      [],
+            "trending_mechanisms":    [],
+            "trending_diseases":      [],
+            "emerging_opportunities": [],
+            "total_papers_analyzed":  0,
+            "last_analyzed":          datetime.now().isoformat()
+        }
+
+    # ── Count keyword mentions ─────────────────────────────────
+    def count_mentions(keywords: list, texts: list) -> list:
+        counts = {}
+        for kw in keywords:
+            kw_lower = kw.lower()
+            count    = sum(1 for t in texts if kw_lower in t["text"])
+            if count > 0:
+                counts[kw] = count
+
+        # Sort by frequency
+        ranked = sorted(counts.items(), key=lambda x: x[1], reverse=True)
+        return [
+            {
+                "name":       name,
+                "mentions":   count,
+                "frequency":  round(count / max(len(texts), 1), 3),
+                "trend":      "🔥 Hot" if count >= 3 else "📈 Rising" if count >= 2 else "👀 Emerging"
+            }
+            for name, count in ranked[:8]
+        ]
+
+    trending_proteins   = count_mentions(TREND_KEYWORDS["proteins"],   all_text)
+    trending_mechanisms = count_mentions(TREND_KEYWORDS["mechanisms"], all_text)
+    trending_diseases   = count_mentions(TREND_KEYWORDS["diseases"],   all_text)
+
+    # ── Generate opportunity signals ──────────────────────────
+    emerging_opportunities = []
+
+    # High-frequency protein + novel mechanism = opportunity
+    for protein in trending_proteins[:3]:
+        for mech in trending_mechanisms[:3]:
+            if protein["mentions"] >= 2 and mech["mentions"] >= 2:
+                emerging_opportunities.append({
+                    "signal":      f"{protein['name']} × {mech['name']}",
+                    "description": (
+                        f"{protein['name']} appearing in {protein['mentions']} recent papers "
+                        f"alongside {mech['name']} research suggests an emerging "
+                        f"drug discovery opportunity."
+                    ),
+                    "strength":    "Strong" if (protein["mentions"] + mech["mentions"]) >= 6 else "Moderate",
+                    "protein":     protein["name"],
+                    "mechanism":   mech["name"]
+                })
+                if len(emerging_opportunities) >= 3:
+                    break
+        if len(emerging_opportunities) >= 3:
+            break
+
+    # Fallback: just highlight top trending entities
+    if not emerging_opportunities and (trending_proteins or trending_mechanisms):
+        top_p = trending_proteins[0] if trending_proteins else None
+        top_m = trending_mechanisms[0] if trending_mechanisms else None
+        if top_p:
+            emerging_opportunities.append({
+                "signal":      f"Increasing {top_p['name']} research activity",
+                "description": f"{top_p['name']} mentioned in {top_p['mentions']} recent publications — monitor for new drug discovery angles.",
+                "strength":    "Moderate",
+                "protein":     top_p["name"],
+                "mechanism":   ""
+            })
+        if top_m:
+            emerging_opportunities.append({
+                "signal":      f"Growing {top_m['name']} research momentum",
+                "description": f"{top_m['name']} appearing in {top_m['mentions']} papers — potential mechanism-of-action opportunity.",
+                "strength":    "Moderate",
+                "protein":     "",
+                "mechanism":   top_m["name"]
+            })
+
+    return {
+        "trending_proteins":      trending_proteins,
+        "trending_mechanisms":    trending_mechanisms,
+        "trending_diseases":      trending_diseases,
+        "emerging_opportunities": emerging_opportunities,
+        "total_papers_analyzed":  total_papers,
+        "last_analyzed":          datetime.now().isoformat()
+    }
+
 
 # ── Quick test ────────────────────────────────────────────────
 if __name__ == "__main__":

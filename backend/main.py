@@ -9,6 +9,7 @@
 #   GET  /diseases/examples   → example disease names for UI
 
 import time
+import json  # ← make sure this is at the top of main.py
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
@@ -37,6 +38,7 @@ from backend.api_security import (
     VALID_API_KEYS
 )
 from backend.services.knowledge_graph import knowledge_graph
+from fastapi.responses import Response
 
 
 # ── App Lifecycle ────────────────────────────────────────────
@@ -221,6 +223,394 @@ def trigger_manual_update():
         "stats":      stats,
         "message":    f"Update complete. Found {total_new} new papers."
     }
+@app.get("/trending-insights", tags=["Updates"])
+def get_trending_insights():
+    """
+    Analyze stored paper updates to detect trending proteins,
+    mechanisms, and emerging drug discovery opportunities.
+
+    Returns keyword frequency analysis across all tracked diseases.
+    """
+    from backend.services.updates_service import analyze_trends
+
+    try:
+        trends = analyze_trends()
+        return {
+            "success": True,
+            "trends":  trends
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Trend analysis failed: {str(e)}"
+        )
+
+@app.post("/repurpose-drug", tags=["Drug Repurposing"])
+def repurpose_drug(request: dict):
+    """
+    Drug Repurposing Mode — find new disease indications for an existing drug.
+
+    Input:
+        drug_name    : str  — Name of the drug to repurpose
+        current_use  : str  — Optional known indication
+
+    Returns:
+        repurposing_candidates: list of disease candidates with reasoning
+        mechanism_summary:      str
+        confidence:             str
+    """
+    from backend.services.hypothesis_service import client, LLM_MODEL, LLM_PROVIDER
+
+    drug_name   = str(request.get("drug_name","")).strip()
+    current_use = str(request.get("current_use","")).strip()
+
+    if not drug_name:
+        raise HTTPException(status_code=422, detail="drug_name is required")
+
+    # ── Known drug mechanisms database (lightweight) ──────────
+    KNOWN_DRUGS = {
+        "LECANEMAB": {
+            "mechanism": "Anti-amyloid beta antibody — binds and clears Aβ aggregates",
+            "primary":   "Alzheimer disease (Phase 4)",
+            "targets":   ["APP","amyloid-beta"]
+        },
+        "METFORMIN": {
+            "mechanism": "AMPK activator — reduces hepatic glucose production",
+            "primary":   "Type 2 diabetes",
+            "targets":   ["AMPK","mTOR","FOXO1"]
+        },
+        "NIROGACESTAT": {
+            "mechanism": "Gamma-secretase inhibitor — blocks PSEN1/PSEN2 cleavage activity",
+            "primary":   "Desmoid tumors (Phase 4)",
+            "targets":   ["PSEN1","PSEN2","Notch"]
+        },
+        "SEMAGACESTAT": {
+            "mechanism": "Gamma-secretase inhibitor — reduces Aβ production",
+            "primary":   "Alzheimer disease (discontinued)",
+            "targets":   ["PSEN1","gamma-secretase"]
+        },
+        "ADUCANUMAB": {
+            "mechanism": "Anti-amyloid antibody targeting Aβ plaques",
+            "primary":   "Alzheimer disease (FDA approved)",
+            "targets":   ["APP","amyloid-beta"]
+        },
+        "SILDENAFIL": {
+            "mechanism": "PDE5 inhibitor — increases cGMP, causes vasodilation",
+            "primary":   "Erectile dysfunction, Pulmonary hypertension",
+            "targets":   ["PDE5A","cGMP"]
+        },
+        "RAPAMYCIN": {
+            "mechanism": "mTOR inhibitor — suppresses mTORC1 signaling",
+            "primary":   "Organ transplant rejection",
+            "targets":   ["MTOR","FKBP12"]
+        },
+    }
+
+    drug_upper = drug_name.upper()
+    drug_info  = KNOWN_DRUGS.get(drug_upper, {
+        "mechanism": f"Mechanism of {drug_name} (from general knowledge)",
+        "primary":   current_use or "Unknown",
+        "targets":   []
+    })
+
+    if LLM_PROVIDER == "mock" or client is None:
+        return {
+            "success": True,
+            "drug_name": drug_name,
+            "mechanism_summary": drug_info["mechanism"],
+            "repurposing_candidates": [
+                {
+                    "disease":     "Parkinson disease",
+                    "rationale":   "Shared pathway with current indication",
+                    "confidence":  "Medium",
+                    "evidence":    "Preclinical models show promise",
+                    "next_step":   "Phase 2 trial design"
+                }
+            ],
+            "confidence": "Mock"
+        }
+
+    prompt = f"""You are a drug repurposing expert with deep knowledge of disease mechanisms, drug targets, and clinical translation.
+
+DRUG TO REPURPOSE: {drug_name}
+PRIMARY INDICATION: {drug_info['primary']}
+MECHANISM: {drug_info['mechanism']}
+KNOWN TARGETS: {', '.join(drug_info['targets']) if drug_info['targets'] else 'Unknown'}
+
+Your task: Identify 3-4 compelling disease indications where {drug_name} might be repurposed.
+
+Consider:
+1. Shared molecular pathways with the drug's known mechanism
+2. Diseases where the drug's targets are implicated
+3. Historical repurposing precedents for similar drug classes
+4. Current clinical evidence or trials for alternative indications
+5. Mechanistic plausibility (not just association)
+
+Return ONLY a JSON object:
+{{
+  "mechanism_summary": "2-sentence explanation of the drug's mechanism relevant to repurposing",
+  "repurposing_candidates": [
+    {{
+      "disease": "Disease name",
+      "rationale": "2-3 sentences: WHY this drug might work for this disease mechanistically",
+      "shared_pathway": "The molecular pathway linking the drug to this disease",
+      "confidence": "High / Medium / Low",
+      "evidence_level": "Preclinical / Phase 1 / Phase 2 / Observational / Theoretical",
+      "key_challenge": "Main obstacle to this repurposing",
+      "next_step": "Specific recommended next step (concrete experiment or trial)"
+    }}
+  ],
+  "overall_repurposing_potential": "High / Medium / Low",
+  "repurposing_rationale": "1-2 sentences on why this drug class is/isn't generally good for repurposing"
+}}
+
+Rank candidates by confidence (highest first). Return ONLY valid JSON.
+"""
+
+    try:
+        response = client.chat.completions.create(
+            model   = LLM_MODEL,
+            messages= [
+                {"role": "system", "content": "Drug repurposing expert. Return only valid JSON."},
+                {"role": "user",   "content": prompt}
+            ],
+            temperature = 0.3,
+            max_tokens  = 1500,
+        )
+
+        raw = response.choices[0].message.content.strip()
+        if raw.startswith("```"):
+            lines = raw.split("\n")
+            raw   = "\n".join(lines[1:-1])
+
+        result = json.loads(raw)
+
+        return {
+            "success":                   True,
+            "drug_name":                 drug_name,
+            "primary_indication":        drug_info["primary"],
+            "mechanism_summary":         result.get("mechanism_summary",""),
+            "repurposing_candidates":    result.get("repurposing_candidates",[]),
+            "overall_potential":         result.get("overall_repurposing_potential","Medium"),
+            "repurposing_rationale":     result.get("repurposing_rationale",""),
+            "confidence":                "AI-generated"
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Repurposing analysis failed: {str(e)}"
+        )
+
+@app.post("/generate-pdf-report", tags=["Reports"])
+def generate_pdf_report_endpoint(request: AnalysisRequest):
+    """
+    Generate a downloadable PDF research report for a disease analysis.
+    Uses cached pipeline result if available.
+    Returns PDF bytes as application/pdf.
+    """
+    from backend.services.pipeline_service   import run_data_pipeline
+    from backend.services.hypothesis_service import generate_hypotheses
+    from backend.services.hypothesis_service import generate_literature_review
+    from backend.services.report_service     import generate_pdf_report
+
+    # Run pipeline (uses cache)
+    pipeline = run_data_pipeline(
+        disease_name = request.disease_name,
+        max_targets  = request.max_targets,
+        max_papers   = request.max_papers,
+        max_drugs    = request.max_drugs
+    )
+
+    if pipeline.analysis_status == "error":
+        raise HTTPException(status_code=422, detail=pipeline.error_message)
+
+    # Generate hypotheses if not cached
+    if not pipeline.hypotheses:
+        pipeline.hypotheses = generate_hypotheses(pipeline, 3)
+
+    if not pipeline.literature_review:
+        pipeline.literature_review = generate_literature_review(pipeline)
+
+    # Serialize to dict for report
+    try:
+        data = pipeline.model_dump()
+    except Exception:
+        data = pipeline.dict()
+
+    # Generate PDF
+    try:
+        pdf_bytes = generate_pdf_report(data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"PDF generation failed: {e}")
+
+    filename = f"AI_Scientist_{request.disease_name.replace(' ','_')}.pdf"
+
+    return Response(
+        content     = pdf_bytes,
+        media_type  = "application/pdf",
+        headers     = {
+            "Content-Disposition": f'attachment; filename="{filename}"'
+        }
+    )
+
+@app.post("/ask-question", tags=["Chat"])
+def ask_question(request: dict):
+    """
+    AI Scientist Chat — Ask anything about a disease analysis.
+
+    Input:
+        question     : str  — The user's question
+        disease_name : str  — Optional disease context
+        context_data : dict — Optional pipeline data for richer answers
+
+    Returns:
+        answer       : str
+        sources_used : list
+        confidence   : str
+    """
+    from backend.services.hypothesis_service import client, LLM_MODEL, LLM_PROVIDER
+
+    question     = str(request.get("question","")).strip()
+    disease_name = str(request.get("disease_name","")).strip()
+    context_data = request.get("context_data") or {}
+
+    if not question:
+        raise HTTPException(status_code=422, detail="question is required")
+
+    if LLM_PROVIDER == "mock" or client is None:
+        return {
+            "success": True,
+            "answer": (
+                f"Mock answer for: '{question}'\n\n"
+                "To get real AI answers, configure your OPENAI_API_KEY in .env"
+            ),
+            "sources_used": ["Mock mode"],
+            "confidence": "N/A"
+        }
+
+    # ── Build rich context from pipeline data ─────────────────
+    context_parts = []
+
+    if disease_name:
+        context_parts.append(f"Disease being analyzed: {disease_name}")
+
+    if context_data:
+        # Proteins
+        proteins = context_data.get("protein_targets", [])
+        if proteins:
+            prot_str = ", ".join([
+                f"{p.get('gene_symbol','')} (score: {p.get('association_score',0):.2f})"
+                for p in proteins[:5]
+            ])
+            context_parts.append(f"Key protein targets: {prot_str}")
+
+        # Drugs
+        drugs = context_data.get("drugs", [])
+        if drugs:
+            drug_str = ", ".join([
+                f"{d.get('drug_name','')} (Phase {d.get('clinical_phase','?')}, "
+                f"Risk: {d.get('risk_level','?')})"
+                for d in drugs[:5]
+            ])
+            context_parts.append(f"Available drugs: {drug_str}")
+
+        # Hypotheses
+        hypotheses = context_data.get("hypotheses", [])
+        if hypotheses:
+            best = hypotheses[0] if hypotheses else {}
+            context_parts.append(
+                f"Top hypothesis: {best.get('title','')} "
+                f"(Score: {best.get('final_score',0):.0%})"
+            )
+            if len(hypotheses) > 1:
+                context_parts.append(
+                    f"Other hypotheses: " +
+                    "; ".join([h.get("title","") for h in hypotheses[1:3]])
+                )
+
+        # Evidence
+        ev = context_data.get("evidence_strength") or {}
+        if ev:
+            context_parts.append(
+                f"Evidence strength: {ev.get('evidence_label','')} "
+                f"({ev.get('total_papers',0)} papers)"
+            )
+
+        # Decision
+        ds = context_data.get("decision_summary") or {}
+        if ds:
+            gng = ds.get("go_no_go") or {}
+            context_parts.append(
+                f"Overall decision: {gng.get('decision','Unknown')} "
+                f"({gng.get('confidence_in_decision',0):.0%} confident) — "
+                f"Recommended: {ds.get('recommended_drug','')} → {ds.get('target_protein','')}"
+            )
+
+        # Papers
+        papers = context_data.get("papers", [])
+        if papers:
+            paper_titles = "; ".join([p.get("title","")[:60] for p in papers[:3]])
+            context_parts.append(f"Recent papers: {paper_titles}")
+
+    context_str = "\n".join(context_parts) if context_parts else "No analysis context available."
+
+    # ── System prompt ─────────────────────────────────────────
+    system_prompt = f"""You are AI Scientist, an expert biomedical research assistant specializing in drug discovery and translational medicine.
+
+You have access to a real analysis of {disease_name or 'a disease'} performed using OpenTargets, FDA FAERS, PubMed, and AlphaFold data.
+
+CURRENT ANALYSIS CONTEXT:
+{context_str}
+
+YOUR ROLE:
+- Answer questions about the disease, proteins, drugs, pathways, and hypotheses shown above
+- Provide scientifically accurate, evidence-based answers
+- Reference specific proteins, drugs, and scores from the context when relevant
+- Be concise but comprehensive (3-5 sentences typical)
+- If asked to compare, use specific data from the context
+- If asked about risk, reference FDA signals and risk levels
+- If asked to explain simply, use analogies
+- If the question is outside your context, say so clearly and answer from general knowledge
+
+STYLE:
+- Professional but accessible
+- Always ground answers in the analysis data when possible
+- Use specific numbers (scores, phases, counts) when relevant
+- Structure longer answers with clear paragraphs"""
+
+    try:
+        response = client.chat.completions.create(
+            model   = LLM_MODEL,
+            messages= [
+                {"role": "system", "content": system_prompt},
+                {"role": "user",   "content": question}
+            ],
+            temperature = 0.4,
+            max_tokens  = 600,
+        )
+
+        answer = response.choices[0].message.content.strip()
+
+        # Determine what sources were used
+        sources = []
+        if context_data.get("protein_targets"): sources.append("OpenTargets protein data")
+        if context_data.get("drugs"):           sources.append("FDA FAERS drug data")
+        if context_data.get("papers"):          sources.append("PubMed literature")
+        if context_data.get("hypotheses"):      sources.append("Generated hypotheses")
+        if not sources:                         sources.append("General biomedical knowledge")
+
+        return {
+            "success":     True,
+            "answer":      answer,
+            "sources_used":sources,
+            "confidence":  "High" if context_data else "Medium",
+            "question":    question,
+            "disease":     disease_name
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"LLM error: {str(e)}")
 
 # ════════════════════════════════════════════════════════════
 # PRODUCTIZED API ENDPOINTS
