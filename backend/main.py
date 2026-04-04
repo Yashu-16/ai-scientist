@@ -36,21 +36,27 @@ from backend.api_security import (
     usage_tracker,
     VALID_API_KEYS
 )
+from backend.services.knowledge_graph import knowledge_graph
 
 
 # ── App Lifecycle ────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Runs on startup and shutdown."""
     print("\n🧬 AI Scientist API starting up...")
     print("   Endpoints ready at http://localhost:8000")
     print("   API docs at     http://localhost:8000/docs\n")
 
-    # Start scheduler for daily updates
+    # Load knowledge graph
+    print("📊 Loading knowledge graph...")
+    stats = knowledge_graph.get_stats()
+    print(f"   Graph: {stats['node_count']} nodes, "
+          f"{stats['edge_count']} edges, "
+          f"{stats['total_analyses']} analyses")
+
+    # Start scheduler
     scheduler = setup_scheduler(app)
     app.state.scheduler = scheduler
 
-    # Run initial update check on startup
     print("🔄 Running initial scientific update check...")
     try:
         run_update_check()
@@ -59,8 +65,7 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    # Shutdown
-    if hasattr(app.state, 'scheduler') and app.state.scheduler:
+    if hasattr(app.state,'scheduler') and app.state.scheduler:
         app.state.scheduler.shutdown()
     print("\n🛑 AI Scientist API shutting down...")
 
@@ -661,6 +666,22 @@ def analyze_disease(request: AnalysisRequest):
             print(f"\n🚦 Overall Decision: "
                   f"{gng.decision_emoji} {gng.decision} "
                   f"({gng.confidence_in_decision:.0%} confident)")
+            # ── V4: Literature review ─────────────────────────────
+        from backend.services.hypothesis_service import \
+            generate_literature_review
+        pipeline_result.literature_review = \
+            generate_literature_review(pipeline_result)
+        print("📄 Literature review generated")
+
+        # ── Ingest into knowledge graph ───────────────────────
+        try:
+            added = knowledge_graph.ingest_pipeline_result(pipeline_result)
+            print(f"📊 Knowledge graph updated: "
+                  f"+{added['proteins']} proteins, "
+                  f"+{added['drugs']} drugs, "
+                  f"+{added['edges']} edges")
+        except Exception as e:
+            print(f"⚠️  Knowledge graph ingest error: {e}")
 
         ds = pipeline_result.decision_summary
         print(f"\n🎯 Decision Summary:")
@@ -691,6 +712,13 @@ def analyze_disease(request: AnalysisRequest):
             status_code = 500,
             detail      = f"Internal server error: {str(e)}"
         )
+
+        # ── V4: Ingest into knowledge graph ──────────────────
+        added = knowledge_graph.ingest_pipeline_result(pipeline_result)
+        print(f"📊 Knowledge graph updated: "
+              f"+{added['proteins']} proteins, "
+              f"+{added['drugs']} drugs, "
+              f"+{added['edges']} edges")
 
 @app.post("/compare-diseases", tags=["Analysis"])
 def compare_diseases(request: MultiDiseaseRequest):
@@ -896,4 +924,33 @@ def compare_diseases(request: MultiDiseaseRequest):
             for name, r in disease_results.items()
         },
         "message": f"Compared {len(disease_results)} diseases in {elapsed}s"
+    }
+
+@app.get("/knowledge-graph/stats", tags=["Knowledge Graph"])
+def kg_stats():
+    """Get knowledge graph statistics."""
+    return {
+        "success": True,
+        "stats":   knowledge_graph.get_stats()
+    }
+
+
+@app.get("/knowledge-graph/insights", tags=["Knowledge Graph"])
+def kg_insights():
+    """Get cross-disease insights from knowledge graph."""
+    return {
+        "success":               True,
+        "cross_disease_proteins":knowledge_graph.get_cross_disease_proteins(),
+        "most_analyzed_drugs":   knowledge_graph.get_most_analyzed_drugs(5),
+        "stats":                 knowledge_graph.get_stats()
+    }
+
+
+@app.get("/knowledge-graph/search", tags=["Knowledge Graph"])
+def kg_search(query: str):
+    """Search the knowledge graph."""
+    return {
+        "success": True,
+        "query":   query,
+        "results": knowledge_graph.search(query)
     }

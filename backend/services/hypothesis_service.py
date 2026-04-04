@@ -864,6 +864,367 @@ def generate_evidence_explanation(hypothesis, detail_level="scientist"):
     except Exception as e:
         return f"Explanation unavailable: {str(e)}"
 
+def compute_time_to_impact(
+    hypothesis:      "Hypothesis",
+    pipeline_result: DiseaseAnalysisResult
+) -> "TimeToImpact":
+    """
+    Feature 5: Estimate time from current stage to clinical impact.
+    Uses clinical phase + risk level + historical benchmarks.
+    """
+    from backend.models.schemas import TimeToImpact
+
+    drug_name  = hypothesis.key_drugs[0] if hypothesis.key_drugs else ""
+    phase      = 0
+    risk_level = "Unknown"
+
+    for drug in pipeline_result.drugs:
+        if drug.drug_name.upper() == drug_name.upper():
+            phase      = drug.clinical_phase or 0
+            risk_level = drug.risk_level
+            break
+
+    # ── Phase-based timeline estimates ───────────────────────
+    # Source: Industry benchmarks (FDA, BIO, Informa)
+    PHASE_DATA = {
+        4: {
+            "stage":       "Phase 4 / FDA Approved",
+            "next":        "Post-market surveillance + label expansion",
+            "years_base":  1.0,
+            "years_range": "0–2 years",
+            "success":     0.85,
+            "speed":       "Fast",
+            "timeline": [
+                "Currently approved / Phase 4 post-market",
+                "Label expansion studies: 1–2 years",
+                "New indication approval: 2–4 years if applicable"
+            ]
+        },
+        3: {
+            "stage":       "Phase 3 Clinical Trial",
+            "next":        "Complete Phase 3, file NDA/BLA with FDA",
+            "years_base":  3.0,
+            "years_range": "2–5 years",
+            "success":     0.58,
+            "speed":       "Medium",
+            "timeline": [
+                "Complete ongoing Phase 3 trial: 1–3 years",
+                "FDA NDA/BLA submission and review: 1–2 years",
+                "Potential approval and launch: +6–12 months"
+            ]
+        },
+        2: {
+            "stage":       "Phase 2 Clinical Trial",
+            "next":        "Complete Phase 2, design Phase 3, seek funding",
+            "years_base":  6.0,
+            "years_range": "5–9 years",
+            "success":     0.32,
+            "speed":       "Medium",
+            "timeline": [
+                "Complete Phase 2 trials: 2–3 years",
+                "Design and fund Phase 3: 1–2 years",
+                "Phase 3 trials: 2–4 years",
+                "FDA review and approval: 1–2 years"
+            ]
+        },
+        1: {
+            "stage":       "Phase 1 Clinical Trial",
+            "next":        "Complete Phase 1 safety, advance to Phase 2",
+            "years_base":  9.0,
+            "years_range": "8–12 years",
+            "success":     0.15,
+            "speed":       "Slow",
+            "timeline": [
+                "Complete Phase 1 safety studies: 1–2 years",
+                "Phase 2 efficacy trials: 2–4 years",
+                "Phase 3 confirmatory trials: 3–5 years",
+                "FDA review and approval: 1–2 years"
+            ]
+        },
+        0: {
+            "stage":       "Preclinical / Research Stage",
+            "next":        "Complete preclinical validation, file IND",
+            "years_base":  12.0,
+            "years_range": "10–15 years",
+            "success":     0.10,
+            "speed":       "Slow",
+            "timeline": [
+                "Preclinical validation: 2–4 years",
+                "IND filing and Phase 1: 2–3 years",
+                "Phase 2 + Phase 3: 5–8 years",
+                "FDA review: 1–2 years"
+            ]
+        }
+    }
+
+    data       = PHASE_DATA.get(phase, PHASE_DATA[0])
+    years_base = data["years_base"]
+    success    = data["success"]
+
+    # ── Adjust for risk ───────────────────────────────────────
+    risk_adjustments = {
+        "High":    (2.0, -0.20),   # +2 years, -20% success
+        "Medium":  (0.5, -0.05),   # +0.5 years, -5% success
+        "Low":     (0.0,  0.05),   # No delay, +5% success
+        "Unknown": (1.0, -0.10)    # +1 year, -10% success
+    }
+    year_adj, success_adj = risk_adjustments.get(risk_level, (1.0, -0.10))
+    years_final  = round(years_base + year_adj, 1)
+    success_final= round(max(0.05, min(0.95, success + success_adj)), 3)
+
+    # ── Bottlenecks ───────────────────────────────────────────
+    bottlenecks = []
+    if risk_level == "High":
+        bottlenecks.append("High FDA adverse event burden requires additional safety studies")
+    if phase <= 2:
+        bottlenecks.append("Multiple trial phases required before regulatory submission")
+    if pipeline_result.evidence_strength and \
+       pipeline_result.evidence_strength.evidence_label in ["Weak","Moderate"]:
+        bottlenecks.append("Limited evidence base may slow regulatory acceptance")
+    if not bottlenecks:
+        bottlenecks.append("Strong profile — main bottleneck is standard regulatory timeline")
+
+    speed_colors = {"Fast":"#22c55e","Medium":"#f59e0b","Slow":"#ef4444"}
+
+    return TimeToImpact(
+        years_to_market     = years_final,
+        years_range         = data["years_range"],
+        current_stage       = data["stage"],
+        next_milestone      = data["next"],
+        success_probability = success_final,
+        speed_category      = data["speed"],
+        speed_color         = speed_colors.get(data["speed"],"#64748b"),
+        timeline_breakdown  = data["timeline"],
+        key_bottlenecks     = bottlenecks
+    )
+
+
+def generate_executive_summaries(
+    hypotheses:      list,
+    pipeline_result: DiseaseAnalysisResult
+) -> list:
+    """
+    Feature 6: Generate non-technical executive summaries.
+    Single batched LLM call for all hypotheses.
+    """
+    from backend.models.schemas import ExecutiveSummary
+
+    if LLM_PROVIDER == "mock" or client is None:
+        for hyp in hypotheses:
+            hyp.executive_summary = _mock_executive_summary(hyp)
+        return hypotheses
+
+    print("\n📋 Generating executive summaries...")
+
+    hyp_list = "\n\n".join([
+        f"Hypothesis {i+1}:\n"
+        f"Title: {hyp.title}\n"
+        f"Drug: {', '.join(hyp.key_drugs)} (Phase {_get_drug_phase(hyp.key_drugs, pipeline_result)})\n"
+        f"Protein: {', '.join(hyp.key_proteins)}\n"
+        f"Score: {hyp.final_score:.0%}\n"
+        f"Decision: {hyp.go_no_go.decision if hyp.go_no_go else 'Unknown'}\n"
+        f"Explanation: {hyp.explanation[:200]}"
+        for i, hyp in enumerate(hypotheses)
+    ])
+
+    prompt = f"""
+You are a biotech communications expert writing for C-suite executives and investors.
+
+Summarize each hypothesis for {pipeline_result.disease_name} in plain business language.
+No jargon. Focus on: what it is, why it matters, what to do, what the risk is.
+
+HYPOTHESES:
+{hyp_list}
+
+Return ONLY a JSON array with exactly {len(hypotheses)} objects:
+[
+  {{
+    "hypothesis_index": 0,
+    "headline": "One punchy sentence (max 15 words) — the elevator pitch",
+    "body": "3-4 sentences for a non-scientist executive. What is the target? Why does it matter for patients? What stage is the drug? What makes this promising?",
+    "market_opportunity": "One sentence about business/market value of this approach",
+    "bottom_line": "One sentence: what decision should be made?"
+  }}
+]
+
+RULES:
+- Avoid: pathway names, gene symbols, molecular biology jargon
+- Use: patient outcomes, market size, competitive advantage, revenue potential
+- Be specific about drug name and disease
+- Keep each field concise and business-focused
+
+Return ONLY valid JSON. No markdown.
+"""
+
+    try:
+        response = client.chat.completions.create(
+            model=LLM_MODEL,
+            messages=[
+                {"role":"system","content":"Biotech communications expert. Return only valid JSON."},
+                {"role":"user","content":prompt}
+            ],
+            temperature=0.4, max_tokens=1500,
+        )
+        raw = response.choices[0].message.content.strip()
+        print(f"   ✅ Executive summary LLM responded ({len(raw)} chars)")
+        if raw.startswith("```"):
+            lines = raw.split("\n")
+            raw   = "\n".join(lines[1:-1])
+
+        for item in json.loads(raw):
+            idx = item.get("hypothesis_index",0)
+            if idx < len(hypotheses):
+                hypotheses[idx].executive_summary = ExecutiveSummary(
+                    headline           = item.get("headline",""),
+                    body               = item.get("body",""),
+                    market_opportunity = item.get("market_opportunity",""),
+                    bottom_line        = item.get("bottom_line",""),
+                    audience_level     = "Executive"
+                )
+                print(f"   • {hypotheses[idx].title[:45]}...")
+                print(f"     Headline: {item.get('headline','')[:50]}")
+
+    except Exception as e:
+        print(f"   ⚠️  Executive summary error: {e}")
+        for hyp in hypotheses:
+            if not hyp.executive_summary:
+                hyp.executive_summary = _mock_executive_summary(hyp)
+
+    return hypotheses
+
+
+def _mock_executive_summary(hyp) -> "ExecutiveSummary":
+    from backend.models.schemas import ExecutiveSummary
+    drug = hyp.key_drugs[0] if hyp.key_drugs else "this compound"
+    return ExecutiveSummary(
+        headline           = f"{drug} shows strong potential for Alzheimer's treatment",
+        body               = (
+            f"{drug} is a clinically validated treatment targeting a key driver "
+            f"of the disease. Current evidence supports a {hyp.final_score:.0%} "
+            f"confidence score, making it one of the stronger candidates in our "
+            f"analysis. The drug has demonstrated meaningful activity and has an "
+            f"established safety profile from clinical trials."
+        ),
+        market_opportunity = (
+            f"The Alzheimer's therapeutics market exceeds $10B annually. "
+            f"{drug} addresses an unmet need with a differentiated mechanism."
+        ),
+        bottom_line        = f"Recommend proceeding with validation studies for {drug}.",
+        audience_level     = "Executive"
+    )
+
+def generate_literature_review(
+    pipeline_result: DiseaseAnalysisResult
+) -> "LiteratureReview":
+    """
+    Feature 7: Generate a structured literature review for the disease analysis.
+    Single LLM call producing a research-style report.
+    """
+    from backend.models.schemas import LiteratureReview
+    from datetime import datetime
+
+    if LLM_PROVIDER == "mock" or client is None:
+        return _mock_literature_review(pipeline_result)
+
+    print("\n📄 Generating literature review...")
+
+    best_hyp = None
+    if pipeline_result.hypotheses:
+        best_hyp = min(pipeline_result.hypotheses, key=lambda h: h.rank)
+
+    proteins_str = ", ".join(
+        [f"{p.gene_symbol} (score: {p.association_score:.2f})"
+         for p in pipeline_result.protein_targets[:4]]
+    )
+    drugs_str = ", ".join(
+        [f"{d.drug_name} (Phase {d.clinical_phase})"
+         for d in pipeline_result.drugs[:4]]
+    )
+    papers_str = "\n".join(
+        [f"- [{p.year}] {p.title[:70]}"
+         for p in pipeline_result.papers[:5]]
+    )
+
+    prompt = f"""
+You are a biomedical research writer. Generate a structured literature review
+for {pipeline_result.disease_name}.
+
+AVAILABLE EVIDENCE:
+- Top proteins: {proteins_str}
+- Known drugs: {drugs_str}
+- Key papers:
+{papers_str}
+- Best hypothesis: {best_hyp.title if best_hyp else 'None'}
+- Evidence strength: {pipeline_result.evidence_strength.evidence_label if pipeline_result.evidence_strength else 'Unknown'}
+
+Write a structured literature review with these EXACT sections.
+Each section should be 2-4 sentences. Be specific and cite the proteins/drugs above.
+
+Return ONLY a JSON object:
+{{
+  "background": "2-3 sentences: what is {pipeline_result.disease_name}, prevalence, current treatment landscape",
+  "current_research": "2-3 sentences: what research directions are most active, what has been tried",
+  "research_gaps": "2-3 sentences: what critical questions remain unanswered, what has failed",
+  "proposed_hypothesis": "2-3 sentences: explain the best hypothesis in scientific terms",
+  "supporting_evidence": "2-3 sentences: what specific evidence supports this direction",
+  "risks_limitations": "2-3 sentences: key risks, limitations, and uncertainties",
+  "conclusion": "2-3 sentences: overall assessment and recommended next steps"
+}}
+
+Return ONLY valid JSON. No markdown.
+"""
+
+    try:
+        response = client.chat.completions.create(
+            model=LLM_MODEL,
+            messages=[
+                {"role":"system","content":"Expert biomedical research writer. Return only valid JSON."},
+                {"role":"user","content":prompt}
+            ],
+            temperature=0.3, max_tokens=1500,
+        )
+        raw = response.choices[0].message.content.strip()
+        print(f"   ✅ Literature review LLM responded ({len(raw)} chars)")
+        if raw.startswith("```"):
+            lines = raw.split("\n")
+            raw   = "\n".join(lines[1:-1])
+
+        data = json.loads(raw)
+        return LiteratureReview(
+            disease_name        = pipeline_result.disease_name,
+            background          = data.get("background",""),
+            current_research    = data.get("current_research",""),
+            research_gaps       = data.get("research_gaps",""),
+            proposed_hypothesis = data.get("proposed_hypothesis",""),
+            supporting_evidence = data.get("supporting_evidence",""),
+            risks_limitations   = data.get("risks_limitations",""),
+            conclusion          = data.get("conclusion",""),
+            generated_at        = datetime.now().strftime("%Y-%m-%d %H:%M")
+        )
+
+    except Exception as e:
+        print(f"   ⚠️  Literature review error: {e}")
+        return _mock_literature_review(pipeline_result)
+
+
+def _mock_literature_review(pipeline_result) -> "LiteratureReview":
+    from backend.models.schemas import LiteratureReview
+    from datetime import datetime
+    disease = pipeline_result.disease_name
+    proteins = ", ".join([p.gene_symbol for p in pipeline_result.protein_targets[:3]])
+    drugs    = ", ".join([d.drug_name for d in pipeline_result.drugs[:3]])
+    return LiteratureReview(
+        disease_name        = disease,
+        background          = f"{disease} is a complex disorder affecting millions worldwide. Current treatments address symptoms but do not modify disease progression. Significant unmet medical need exists for disease-modifying therapies.",
+        current_research    = f"Research has focused on key protein targets including {proteins}. Multiple drug candidates including {drugs} have entered clinical evaluation. The field is moving toward combination approaches and precision medicine strategies.",
+        research_gaps       = "Direct causality between protein targets and disease progression remains incompletely established. Long-term efficacy of current drug candidates is uncertain. Biomarker development for patient stratification lags behind drug development.",
+        proposed_hypothesis = f"The leading hypothesis proposes targeting key proteins in the disease pathway using validated drug candidates. This approach addresses core pathological mechanisms based on available evidence.",
+        supporting_evidence = "OpenTargets association scores support protein-disease links. FDA-approved or late-stage clinical drugs provide mechanistic validation. Research papers from PubMed support pathway involvement.",
+        risks_limitations   = "Correlation vs causation remains a key limitation. Safety signals detected in FDA FAERS require monitoring. Evidence base is moderate and may not fully support all conclusions.",
+        conclusion          = f"Based on current evidence, {disease} represents a tractable target for therapeutic intervention. The identified protein-drug combinations warrant further investigation. Experimental validation is recommended as an immediate next step.",
+        generated_at        = datetime.now().strftime("%Y-%m-%d %H:%M")
+    )
+
 
 # ── 7. Main Generation Function ───────────────────────────────
 
@@ -876,45 +1237,37 @@ def generate_hypotheses(
     if LLM_PROVIDER == "mock" or client is None:
         print("   ℹ️  Using mock hypotheses (no LLM key configured)")
         hypotheses = get_mock_hypotheses(pipeline_result.disease_name)
-        ranked = rank_hypotheses(hypotheses, pipeline_result)
-        ranked = add_causal_analysis(ranked, pipeline_result)
-        ranked = generate_validation_suggestions(ranked, pipeline_result)
-        ranked = generate_hypothesis_critiques(ranked, pipeline_result)
-        ranked = add_hypothesis_uncertainty(ranked, pipeline_result)
-        ranked = add_hypothesis_go_no_go(ranked, pipeline_result)
-        ranked = generate_failure_predictions(ranked, pipeline_result)
-        return ranked
-
-    evidence_context = build_llm_context(pipeline_result)
-    user_prompt = HYPOTHESIS_PROMPT_TEMPLATE.format(
-        disease_name     = pipeline_result.disease_name,
-        num_hypotheses   = num_hypotheses,
-        evidence_context = evidence_context
-    )
-
-    print(f"\n🤖 Sending evidence to {LLM_MODEL}...")
-    print(f"   Evidence context : {len(evidence_context)} characters")
-    print(f"   Requesting       : {num_hypotheses} hypotheses")
-
-    try:
-        response = client.chat.completions.create(
-            model=LLM_MODEL,
-            messages=[
-                {"role":"system","content":SYSTEM_PROMPT},
-                {"role":"user","content":user_prompt}
-            ],
-            temperature=0.4, max_tokens=3000,
+    else:
+        evidence_context = build_llm_context(pipeline_result)
+        user_prompt = HYPOTHESIS_PROMPT_TEMPLATE.format(
+            disease_name     = pipeline_result.disease_name,
+            num_hypotheses   = num_hypotheses,
+            evidence_context = evidence_context
         )
-        raw_response = response.choices[0].message.content.strip()
-        print(f"   ✅ LLM responded ({len(raw_response)} chars)")
-        hypotheses = parse_hypothesis_response(raw_response, pipeline_result.disease_name)
+        print(f"\n🤖 Sending evidence to {LLM_MODEL}...")
+        print(f"   Evidence context : {len(evidence_context)} characters")
+        print(f"   Requesting       : {num_hypotheses} hypotheses")
 
-    except Exception as e:
-        print(f"   ❌ LLM error: {e}")
-        print("   ℹ️  Falling back to mock hypotheses")
-        hypotheses = get_mock_hypotheses(pipeline_result.disease_name)
+        try:
+            response = client.chat.completions.create(
+                model=LLM_MODEL,
+                messages=[
+                    {"role":"system","content":SYSTEM_PROMPT},
+                    {"role":"user","content":user_prompt}
+                ],
+                temperature=0.4, max_tokens=3000,
+            )
+            raw_response = response.choices[0].message.content.strip()
+            print(f"   ✅ LLM responded ({len(raw_response)} chars)")
+            hypotheses = parse_hypothesis_response(
+                raw_response, pipeline_result.disease_name
+            )
+        except Exception as e:
+            print(f"   ❌ LLM error: {e}")
+            print("   ℹ️  Falling back to mock hypotheses")
+            hypotheses = get_mock_hypotheses(pipeline_result.disease_name)
 
-    # ── All 7 stages ──────────────────────────────────────────
+    # ── All 9 stages run for BOTH mock and real ───────────────
     ranked = rank_hypotheses(hypotheses, pipeline_result)
     ranked = add_causal_analysis(ranked, pipeline_result)
     ranked = generate_validation_suggestions(ranked, pipeline_result)
@@ -922,6 +1275,19 @@ def generate_hypotheses(
     ranked = add_hypothesis_uncertainty(ranked, pipeline_result)
     ranked = add_hypothesis_go_no_go(ranked, pipeline_result)
     ranked = generate_failure_predictions(ranked, pipeline_result)
+
+    # ── Stage 8: Time-to-impact ───────────────────────────────
+    print("\n⏱️  Computing time-to-impact estimates...")
+    for hyp in ranked:
+        hyp.time_to_impact = compute_time_to_impact(hyp, pipeline_result)
+        tti = hyp.time_to_impact
+        print(f"   • {hyp.title[:45]}...\n"
+              f"     {tti.speed_category} track | "
+              f"{tti.years_range} | "
+              f"Success: {tti.success_probability:.0%}")
+
+    # ── Stage 9: Executive summaries ─────────────────────────
+    ranked = generate_executive_summaries(ranked, pipeline_result)
 
     return ranked
 

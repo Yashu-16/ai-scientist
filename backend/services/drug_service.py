@@ -66,6 +66,178 @@ MOCK_DRUG_DATA = {
     }]
 }
 
+# ── Drug Class Competition Database ──────────────────────────
+# Curated competitive landscape for major drug classes
+# Used for market intelligence without requiring additional APIs
+
+DRUG_CLASS_COMPETITION = {
+    # Gamma-secretase inhibitors/modulators
+    "gamma-secretase inhibitor": {
+        "class":        "Gamma-secretase inhibitor",
+        "similar_drugs":["Semagacestat","Avagacestat","BMS-708163",
+                         "LY-450139","MK-0752","PF-3084014"],
+        "level":        "High",
+        "opportunity":  "Crowded",
+        "note":         "Highly competitive class; multiple Phase 3 failures. Differentiation required."
+    },
+    "gamma-secretase modulator": {
+        "class":        "Gamma-secretase modulator",
+        "similar_drugs":["Tarenflurbil","CHF-5074","NIC5-15"],
+        "level":        "Medium",
+        "opportunity":  "Moderate",
+        "note":         "Modulator class less crowded than inhibitors; better safety profile sought."
+    },
+    # Amyloid-beta antibodies
+    "amyloid-beta": {
+        "class":        "Amyloid-beta antibody",
+        "similar_drugs":["Aducanumab","Lecanemab","Donanemab",
+                         "Gantenerumab","Solanezumab","Crenezumab"],
+        "level":        "High",
+        "opportunity":  "Crowded",
+        "note":         "Highly competitive; FDA approvals exist. Strong clinical precedent but crowded."
+    },
+    "amyloid beta": {
+        "class":        "Amyloid-beta targeting agent",
+        "similar_drugs":["Aducanumab","Lecanemab","Donanemab","Gantenerumab"],
+        "level":        "High",
+        "opportunity":  "Crowded",
+        "note":         "Major pharma companies active. Requires significant differentiation."
+    },
+    # BACE inhibitors
+    "bace": {
+        "class":        "BACE inhibitor",
+        "similar_drugs":["Verubecestat","Atabecestat","Lanabecestat",
+                         "Elenbecestat","CNP520"],
+        "level":        "Medium",
+        "opportunity":  "Moderate",
+        "note":         "Multiple Phase 3 failures. Space less crowded now; selective inhibitors sought."
+    },
+    # NMDA antagonists
+    "nmda": {
+        "class":        "NMDA receptor antagonist",
+        "similar_drugs":["Memantine","Ketamine","Esketamine",
+                         "Nitromemantine","NitroSynapsin"],
+        "level":        "Medium",
+        "opportunity":  "Moderate",
+        "note":         "Established class with marketed drugs. Novel mechanisms needed."
+    },
+    # LRRK2 inhibitors (Parkinson's)
+    "lrrk2": {
+        "class":        "LRRK2 kinase inhibitor",
+        "similar_drugs":["DNL201","DNL151","BIIB122","PF-06685360"],
+        "level":        "Medium",
+        "opportunity":  "Moderate",
+        "note":         "Active clinical development. First-in-class advantage still possible."
+    },
+    # Alpha-synuclein antibodies
+    "alpha-synuclein": {
+        "class":        "Alpha-synuclein antibody",
+        "similar_drugs":["Prasinezumab","Cinpanemab","Buntanetap",
+                         "MEDI1341","Lu AF82422"],
+        "level":        "Medium",
+        "opportunity":  "Moderate",
+        "note":         "Multiple Phase 2 programs active. Target validation still ongoing."
+    },
+    # HER2 targeting (cancer)
+    "her2": {
+        "class":        "HER2-targeting agent",
+        "similar_drugs":["Trastuzumab","Pertuzumab","Lapatinib",
+                         "Neratinib","Tucatinib","T-DM1","T-DXd"],
+        "level":        "High",
+        "opportunity":  "Crowded",
+        "note":         "Extremely competitive class. Multiple approved agents. Combination strategies needed."
+    },
+    # CDK4/6 inhibitors
+    "cdk": {
+        "class":        "CDK inhibitor",
+        "similar_drugs":["Palbociclib","Ribociclib","Abemaciclib",
+                         "Trilaciclib","Lerociclib"],
+        "level":        "High",
+        "opportunity":  "Crowded",
+        "note":         "3 approved CDK4/6 inhibitors dominate breast cancer. Differentiation critical."
+    },
+    # GLP-1 agonists (diabetes)
+    "glp": {
+        "class":        "GLP-1 receptor agonist",
+        "similar_drugs":["Semaglutide","Liraglutide","Dulaglutide",
+                         "Exenatide","Tirzepatide"],
+        "level":        "High",
+        "opportunity":  "Crowded",
+        "note":         "Blockbuster class. Semaglutide dominates. Differentiation through delivery or combo needed."
+    },
+    # Default for unknown
+    "default": {
+        "class":        "Unknown drug class",
+        "similar_drugs":[],
+        "level":        "Low",
+        "opportunity":  "Strong",
+        "note":         "Limited competition data available. Potentially novel mechanism."
+    }
+}
+
+COMPETITION_COLORS = {
+    "Low":    "#22c55e",
+    "Medium": "#f59e0b",
+    "High":   "#ef4444"
+}
+
+OPPORTUNITY_COLORS = {
+    "Strong":   "#22c55e",
+    "Moderate": "#f59e0b",
+    "Crowded":  "#ef4444"
+}
+
+
+def classify_competition(
+    drug_name:  str,
+    mechanism:  str,
+    drug_type:  str
+) -> "CompetitionIntel":
+    """
+    Classify competitive landscape for a drug based on mechanism.
+
+    Args:
+        drug_name : Name of the drug
+        mechanism : Mechanism of action string
+        drug_type : Drug type (Small molecule / Antibody / etc.)
+
+    Returns:
+        CompetitionIntel object
+    """
+    from backend.models.schemas import CompetitionIntel
+
+    mechanism_lower = mechanism.lower()
+    drug_lower      = drug_name.lower()
+
+    # Match against competition database
+    matched = None
+    for keyword, data in DRUG_CLASS_COMPETITION.items():
+        if keyword == "default":
+            continue
+        if keyword in mechanism_lower or keyword in drug_lower:
+            matched = data
+            break
+
+    if not matched:
+        matched = DRUG_CLASS_COMPETITION["default"]
+
+    # Remove the drug itself from similar drugs list
+    similar = [d for d in matched["similar_drugs"]
+               if d.lower() != drug_lower][:5]
+
+    level = matched["level"]
+    color = COMPETITION_COLORS.get(level, "#64748b")
+
+    return CompetitionIntel(
+        competition_level  = level,
+        competition_color  = color,
+        num_similar_drugs  = len(similar),
+        similar_drug_names = similar,
+        market_opportunity = matched["opportunity"],
+        strategic_note     = matched["note"],
+        drug_class         = matched["class"]
+    )
+
 
 def classify_fda_risk(adverse_events: list) -> tuple:
     """
@@ -235,12 +407,32 @@ def fetch_drug_data_for_disease(
             # ── Classify Risk ─────────────────────────────────
             risk_level, risk_description, risk_color = classify_fda_risk(fda_events)
 
+            # ── Competition Intelligence ──────────────────────
+            comp_intel = classify_competition(
+                drug_name = drug_name,
+                mechanism = drug.get("mechanism",""),
+                drug_type = drug.get("drug_type","")
+            )
+
+            print(
+                f"        Competition: {comp_intel.competition_level} "
+                f"({comp_intel.num_similar_drugs} similar drugs)"
+            )
+
             all_drug_data.append({
                 **drug,
                 "fda_adverse_events": fda_events,
                 "risk_level":         risk_level,
                 "risk_description":   risk_description,
-                "risk_color":         risk_color      # Used by frontend
+                "risk_color":         risk_color,
+                # V4 Feature 4
+                "competition_level":    comp_intel.competition_level,
+                "competition_color":    comp_intel.competition_color,
+                "num_similar_drugs":    comp_intel.num_similar_drugs,
+                "similar_drug_names":   comp_intel.similar_drug_names,
+                "market_opportunity":   comp_intel.market_opportunity,
+                "strategic_note":       comp_intel.strategic_note,
+                "drug_class":           comp_intel.drug_class
             })
 
             print(

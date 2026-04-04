@@ -334,6 +334,17 @@ def render_hypothesis_card(hyp: dict, data: dict, expanded: bool = False):
         if fp:
             render_failure_prediction(fp)
 
+
+        # ── Time-to-Impact ────────────────────────────────────
+        tti = hyp.get("time_to_impact") or {}
+        if tti:
+            render_time_to_impact(tti)
+
+        # ── Executive Summary ─────────────────────────────────
+        es = hyp.get("executive_summary") or {}
+        if es:
+            render_executive_summary(es)
+
         # ── Uncertainty Analysis ──────────────────────────────
         unc = hyp.get("uncertainty") or {}
         if unc:
@@ -961,6 +972,188 @@ def render_failure_prediction(fp: dict):
             "</div>",
             unsafe_allow_html=True
         )
+
+def _similar_drugs_html(similar: list) -> str:
+    """Helper to build similar drugs HTML without backslashes in f-string."""
+    if not similar:
+        return ""
+    drugs_str = ", ".join(similar[:4])
+    return (
+        f"<div style='font-size:11px;color:#64748b;'>"
+        f"Similar drugs: {drugs_str}</div>"
+    )
+
+def render_competition_badge(drug: dict, compact: bool = False):
+    """Render competition intelligence for a drug."""
+    comp = drug.get("competition_intel") or {}
+    if not comp:
+        return
+
+    level     = str(comp.get("competition_level") or "Unknown")
+    color     = str(comp.get("competition_color") or "#64748b")
+    opp       = str(comp.get("market_opportunity") or "")
+    note      = str(comp.get("strategic_note") or "")
+    drug_class= str(comp.get("drug_class") or "")
+    n_similar = int(comp.get("num_similar_drugs") or 0)
+    similar   = comp.get("similar_drug_names") or []
+
+    opp_color = {"Strong":"#22c55e","Moderate":"#f59e0b",
+                 "Crowded":"#ef4444"}.get(opp,"#64748b")
+    level_emoji = {"Low":"🟢","Medium":"🟡","High":"🔴"}.get(level,"⚪")
+    opp_emoji   = {"Strong":"🌟","Moderate":"⚡","Crowded":"🏁"}.get(opp,"❓")
+
+    if compact:
+        st.markdown(
+            f"<span style='background:{color}22;color:{color};"
+            f"padding:3px 8px;border-radius:8px;font-size:11px;"
+            f"font-weight:600;'>{level_emoji} {level} Competition</span>",
+            unsafe_allow_html=True
+        )
+        return
+
+    st.markdown(
+        f"<div style='background:#0f172a;border:1px solid #1e293b;"
+        f"border-radius:10px;padding:14px;margin:6px 0;'>"
+        f"<div style='display:flex;justify-content:space-between;"
+        f"align-items:flex-start;margin-bottom:10px;'>"
+        f"<div>"
+        f"<div style='font-size:11px;color:#94a3b8;text-transform:uppercase;"
+        f"letter-spacing:1px;margin-bottom:4px;'>Drug Class</div>"
+        f"<div style='color:#e2e8f0;font-size:13px;font-weight:600;'>"
+        f"{drug_class}</div>"
+        f"</div>"
+        f"<div style='display:flex;gap:8px;'>"
+        f"<span style='background:{color}22;color:{color};"
+        f"padding:4px 10px;border-radius:8px;font-size:12px;"
+        f"font-weight:700;'>{level_emoji} {level} Competition</span>"
+        f"<span style='background:{opp_color}22;color:{opp_color};"
+        f"padding:4px 10px;border-radius:8px;font-size:12px;"
+        f"font-weight:700;'>{opp_emoji} {opp}</span>"
+        f"</div></div>"
+        f"<div style='font-size:12px;color:#94a3b8;"
+        f"margin-bottom:8px;'>{note}</div>"
+        f"{_similar_drugs_html(similar)}"
+        f"</div>",
+        unsafe_allow_html=True
+    )
+
+def render_time_to_impact(tti: dict):
+    """Render time-to-impact prediction."""
+    if not tti:
+        return
+
+    years   = float(tti.get("years_to_market") or 0)
+    yr_rng  = str(tti.get("years_range") or "")
+    stage   = str(tti.get("current_stage") or "")
+    next_m  = str(tti.get("next_milestone") or "")
+    success = float(tti.get("success_probability") or 0)
+    speed   = str(tti.get("speed_category") or "")
+    color   = str(tti.get("speed_color") or "#64748b")
+    timeline= tti.get("timeline_breakdown") or []
+    bottlenecks = tti.get("key_bottlenecks") or []
+
+    speed_emoji = {"Fast":"🚀","Medium":"⚡","Slow":"🐢"}.get(speed,"⏱️")
+
+    st.markdown("**⏱️ Time-to-Market Estimate**")
+
+    t1,t2,t3 = st.columns(3)
+    with t1:
+        st.markdown(
+            f"<div style='background:#0f172a;border:1px solid #1e293b;"
+            f"border-radius:10px;padding:14px;text-align:center;'>"
+            f"<div style='font-size:11px;color:#94a3b8;margin-bottom:4px;'>"
+            f"Estimated Timeline</div>"
+            f"<div style='color:{color};font-size:24px;font-weight:800;'>"
+            f"{speed_emoji} {yr_rng}</div>"
+            f"<div style='color:#64748b;font-size:11px;'>{speed} track</div>"
+            f"</div>",
+            unsafe_allow_html=True
+        )
+    with t2:
+        sc_color = confidence_color(success)
+        st.markdown(
+            f"<div style='background:#0f172a;border:1px solid #1e293b;"
+            f"border-radius:10px;padding:14px;text-align:center;'>"
+            f"<div style='font-size:11px;color:#94a3b8;margin-bottom:4px;'>"
+            f"Success Probability</div>"
+            f"<div style='color:{sc_color};font-size:24px;font-weight:800;'>"
+            f"{success:.0%}</div>"
+            f"<div style='color:#64748b;font-size:11px;'>to market</div>"
+            f"</div>",
+            unsafe_allow_html=True
+        )
+    with t3:
+        st.markdown(
+            f"<div style='background:#0f172a;border:1px solid #1e293b;"
+            f"border-radius:10px;padding:14px;'>"
+            f"<div style='font-size:11px;color:#94a3b8;margin-bottom:4px;'>"
+            f"Current Stage</div>"
+            f"<div style='color:#e2e8f0;font-size:12px;font-weight:600;'>"
+            f"{stage}</div>"
+            f"<div style='color:#64748b;font-size:11px;margin-top:4px;'>"
+            f"Next: {next_m[:50]}...</div>"
+            f"</div>",
+            unsafe_allow_html=True
+        )
+
+    if timeline:
+        st.markdown("**📅 Timeline Breakdown:**")
+        for i, step in enumerate(timeline, 1):
+            st.markdown(
+                f"<div style='background:#0f172a;"
+                f"border-left:3px solid {color};"
+                f"padding:6px 12px;margin:3px 0;"
+                f"border-radius:0 6px 6px 0;"
+                f"font-size:12px;color:#cbd5e1;'>"
+                f"<strong style='color:{color};'>{i}.</strong> {step}"
+                f"</div>",
+                unsafe_allow_html=True
+            )
+
+    if bottlenecks:
+        st.markdown(
+            "<div style='background:#1a1105;border:1px solid #92400e44;"
+            "border-radius:8px;padding:10px 14px;margin-top:6px;'>"
+            "<div style='color:#fbbf24;font-size:11px;font-weight:700;"
+            "text-transform:uppercase;letter-spacing:1px;"
+            "margin-bottom:4px;'>⚠️ Key Bottlenecks</div>" +
+            "".join([
+                f"<div style='color:#fde68a;font-size:12px;"
+                f"margin:2px 0;'>• {b}</div>"
+                for b in bottlenecks
+            ]) +
+            "</div>",
+            unsafe_allow_html=True
+        )
+
+
+def render_executive_summary(es: dict):
+    """Render executive summary card."""
+    if not es:
+        return
+
+    headline = str(es.get("headline") or "")
+    body     = str(es.get("body") or "")
+    market   = str(es.get("market_opportunity") or "")
+    bottom   = str(es.get("bottom_line") or "")
+
+    st.markdown("**📋 Executive Summary**")
+    st.markdown(
+        f"<div style='background:linear-gradient(135deg,#0f1b2d,#1a2744);"
+        f"border:1px solid #2d4a7a;border-radius:10px;padding:16px;'>"
+        f"<div style='color:#60a5fa;font-size:16px;font-weight:700;"
+        f"margin-bottom:10px;'>💼 {headline}</div>"
+        f"<div style='color:#cbd5e1;font-size:13px;line-height:1.7;"
+        f"margin-bottom:10px;'>{body}</div>"
+        f"<div style='background:#0a1628;border-radius:6px;padding:8px 12px;"
+        f"margin-bottom:8px;font-size:12px;color:#94a3b8;'>"
+        f"💰 {market}</div>"
+        f"<div style='background:#0a1f0a;border-radius:6px;padding:8px 12px;"
+        f"font-size:13px;color:#4ade80;font-weight:600;'>"
+        f"✅ Bottom Line: {bottom}</div>"
+        f"</div>",
+        unsafe_allow_html=True
+    )
 
 def render_network_graph(network_data: dict, disease_name: str):
     """
@@ -1997,17 +2190,58 @@ elif analyze_clicked and disease_input.strip():
         st.divider()
 
     # ── Tabs ──────────────────────────────────────────────────
-    tab1,tab2,tab3,tab4,tab5,tab6 = st.tabs([
+    tab1,tab2,tab3,tab4,tab5,tab6,tab7 = st.tabs([
         "💡 Hypotheses",
         "🧬 Proteins & Evidence",
         "💊 Drugs",
         "⚠️ Risk Analysis",
         "🕸️ Network",
-        "📡 Live Updates"
+        "📡 Live Updates",
+        "📄 Literature Review"
     ])
 
     # ── TAB 1: HYPOTHESES ────────────────────────────────────
     with tab1:
+        # ── Decision Dashboard ────────────────────────────────
+        st.markdown("### 🎯 Decision Dashboard")
+        dash_cols = st.columns(len(data["hypotheses"]))
+        for i, hyp in enumerate(data["hypotheses"]):
+            with dash_cols[i]:
+                rank   = int(hyp.get("rank",i+1))
+                final  = float(hyp.get("final_score",0))
+                gng    = hyp.get("go_no_go") or {}
+                tti    = hyp.get("time_to_impact") or {}
+                fp     = hyp.get("failure_prediction") or {}
+                medals = {1:"🥇",2:"🥈",3:"🥉"}
+                medal  = medals.get(rank,f"#{rank}")
+                g_dec  = gng.get("decision","")
+                g_col  = gng.get("decision_color","#64748b")
+                g_em   = gng.get("decision_emoji","❓")
+                sp_col = confidence_color(final)
+
+                st.markdown(
+                    f"<div style='background:#0f172a;"
+                    f"border:1px solid #1e293b;"
+                    f"border-radius:10px;padding:16px;"
+                    f"text-align:center;'>"
+                    f"<div style='font-size:28px;'>{medal}</div>"
+                    f"<div style='color:{sp_col};font-weight:800;"
+                    f"font-size:24px;margin:4px 0;'>{final:.0%}</div>"
+                    f"<div style='color:{g_col};font-weight:700;"
+                    f"font-size:16px;margin-bottom:8px;'>"
+                    f"{g_em} {g_dec}</div>"
+                    f"<div style='color:#94a3b8;font-size:11px;"
+                    f"margin-bottom:6px;'>"
+                    f"{', '.join(hyp.get('key_drugs',[]) or ['—'])}</div>"
+                    f"<div style='background:{g_col}22;border-radius:6px;"
+                    f"padding:4px;font-size:11px;color:{g_col};'>"
+                    f"⏱️ {tti.get('years_range','?')} | "
+                    f"🎯 {fp.get('success_probability',0):.0%} success"
+                    f"</div></div>",
+                    unsafe_allow_html=True
+                )
+
+        st.divider()
         st.markdown("### 📊 Hypothesis Comparison")
         render_comparison_table(data)
         st.divider()
@@ -2095,7 +2329,7 @@ elif analyze_clicked and disease_input.strip():
                   "Low":("#052e16","#22c55e","🟢"),
                   "Unknown":("#1a1f2e","#64748b","⚪")}
             r_bg,r_fg,r_em = rs.get(risk,rs["Unknown"])
-            col1,col2,col3,col4 = st.columns([2,3,2,2])
+            col1,col2,col3,col4,col5 = st.columns([2,2.5,2,2,2])
             with col1:
                 st.markdown(f"**💊 {drug['drug_name']}**")
                 st.caption(f"Type: {drug['drug_type']}")
@@ -2130,6 +2364,22 @@ elif analyze_clicked and disease_input.strip():
                     f"<div style='color:#94a3b8;font-size:11px;"
                     f"margin-top:4px;'>{risk_desc[:80]}...</div></div>",
                     unsafe_allow_html=True)
+            with col5:
+                comp = drug.get("competition_intel") or {}
+                if comp:
+                    st.markdown("**🏁 Competition**")
+                    render_competition_badge(drug, compact=True)
+                    n_sim = comp.get("num_similar_drugs",0)
+                    opp   = comp.get("market_opportunity","")
+                    opp_c = {"Strong":"#22c55e","Moderate":"#f59e0b",
+                             "Crowded":"#ef4444"}.get(opp,"#64748b")
+                    st.markdown(
+                        f"<div style='font-size:11px;color:#64748b;"
+                        f"margin-top:4px;'>{n_sim} similar drugs</div>"
+                        f"<div style='color:{opp_c};font-size:11px;"
+                        f"font-weight:600;'>{opp} opportunity</div>",
+                        unsafe_allow_html=True
+                    )
             st.divider()
 
     # ── TAB 4: RISK ANALYSIS ─────────────────────────────────
@@ -2170,6 +2420,12 @@ elif analyze_clicked and disease_input.strip():
                     f"<div style='color:#94a3b8;margin-top:4px;'>"
                     f"{risk_desc}</div></div>",
                     unsafe_allow_html=True)
+                # Competition Intelligence
+                comp = drug.get("competition_intel") or {}
+                if comp:
+                    st.markdown("**🏁 Competitive Landscape**")
+                    render_competition_badge(drug, compact=False)
+                    st.divider()
                 if fda_data:
                     st.markdown("**Top FDA Adverse Events:**")
                     for ae in fda_data[:5]:
@@ -2342,7 +2598,154 @@ elif analyze_clicked and disease_input.strip():
                         st.error(f"Failed: {e}")
 
         except Exception as e:
-            st.caption(f"Could not load tracked diseases: {e}")    
+            st.caption(f"Could not load tracked diseases: {e}")
+        st.divider()
+        st.markdown("### 🧠 Knowledge Graph Memory")
+        st.caption("Accumulated intelligence from all past analyses")
+
+        try:
+            kg_r = requests.get(
+                f"{API_BASE_URL}/knowledge-graph/insights",
+                timeout=10
+            )
+            if kg_r.status_code == 200:
+                kg   = kg_r.json()
+                stats= kg.get("stats",{})
+                cross= kg.get("cross_disease_proteins",[])
+                drugs= kg.get("most_analyzed_drugs",[])
+
+                kg1,kg2,kg3,kg4 = st.columns(4)
+                kg1.metric("🔵 Total Nodes",
+                           stats.get("node_count",0))
+                kg2.metric("🔗 Total Edges",
+                           stats.get("edge_count",0))
+                kg3.metric("🔬 Analyses Run",
+                           stats.get("total_analyses",0))
+                kg4.metric("🧬 Proteins Tracked",
+                           stats.get("total_proteins",0))
+
+                if cross:
+                    st.markdown("**🔁 Cross-Disease Proteins:**")
+                    for p in cross[:5]:
+                        diseases = ", ".join(p.get("diseases",[]))
+                        st.markdown(
+                            f"<div style='background:#1e3a5f22;"
+                            f"border-left:3px solid #60a5fa;"
+                            f"padding:6px 12px;margin:3px 0;"
+                            f"border-radius:0 6px 6px 0;'>"
+                            f"<span style='color:#60a5fa;font-weight:700;'>"
+                            f"{p.get('gene_symbol','')}</span>"
+                            f"<span style='color:#64748b;font-size:12px;"
+                            f"margin-left:10px;'>Found in: {diseases}"
+                            f"</span></div>",
+                            unsafe_allow_html=True
+                        )
+
+                if drugs:
+                    st.markdown("**💊 Most Analyzed Drugs:**")
+                    for d in drugs[:5]:
+                        phase = d.get("phase","?")
+                        apps  = d.get("appearances",0)
+                        st.markdown(
+                            f"<div style='background:#1e3a2f22;"
+                            f"border-left:3px solid #34d399;"
+                            f"padding:6px 12px;margin:3px 0;"
+                            f"border-radius:0 6px 6px 0;'>"
+                            f"<span style='color:#34d399;font-weight:700;'>"
+                            f"{d.get('drug_name',d.get('name',''))}</span>"
+                            f"<span style='color:#64748b;font-size:12px;"
+                            f"margin-left:10px;'>"
+                            f"Phase {phase} | {apps} appearances</span>"
+                            f"</div>",
+                            unsafe_allow_html=True
+                        )
+
+                # Graph search
+                st.markdown("**🔍 Search Knowledge Graph**")
+                kg_query = st.text_input(
+                    "Search", placeholder="e.g. PSEN1, LECANEMAB",
+                    key="kg_search", label_visibility="collapsed"
+                )
+                if kg_query:
+                    sr = requests.get(
+                        f"{API_BASE_URL}/knowledge-graph/search",
+                        params={"query": kg_query}, timeout=5
+                    )
+                    if sr.status_code == 200:
+                        results = sr.json().get("results",{})
+                        if results.get("proteins") or results.get("drugs"):
+                            for node_dict in (results.get("proteins",[]) +
+                                              results.get("drugs",[])):
+                                for key, val in node_dict.items():
+                                    st.json(val)
+                        else:
+                            st.caption(f"No results for '{kg_query}'")
+
+        except Exception as e:
+            st.caption(f"Knowledge graph unavailable: {e}")   
+
+    # ── TAB 7: LITERATURE REVIEW ─────────────────────────────
+    with tab7:
+        st.markdown("### 📄 Auto-Generated Literature Review")
+        st.caption(
+            f"AI-generated research summary for **{data['disease_name']}** "
+            f"based on retrieved evidence"
+        )
+
+        lr = data.get("literature_review") or {}
+        if lr:
+            gen_at = lr.get("generated_at","")
+            if gen_at:
+                st.caption(f"Generated: {gen_at}")
+
+            sections = [
+                ("🔬 Background",           "background"),
+                ("📚 Current Research",      "current_research"),
+                ("🔍 Research Gaps",         "research_gaps"),
+                ("💡 Proposed Hypothesis",   "proposed_hypothesis"),
+                ("📊 Supporting Evidence",   "supporting_evidence"),
+                ("⚠️ Risks & Limitations",  "risks_limitations"),
+                ("✅ Conclusion",            "conclusion"),
+            ]
+
+            section_colors = [
+                "#3b82f6","#8b5cf6","#f59e0b",
+                "#22c55e","#06b6d4","#ef4444","#22c55e"
+            ]
+
+            for (title, key), color in zip(sections, section_colors):
+                content = lr.get(key,"")
+                if content:
+                    st.markdown(
+                        f"<div style='background:#0f172a;"
+                        f"border-left:4px solid {color};"
+                        f"border-radius:0 8px 8px 0;"
+                        f"padding:14px 16px;margin:8px 0;'>"
+                        f"<div style='color:{color};font-weight:700;"
+                        f"font-size:13px;text-transform:uppercase;"
+                        f"letter-spacing:1px;margin-bottom:8px;'>"
+                        f"{title}</div>"
+                        f"<div style='color:#cbd5e1;font-size:14px;"
+                        f"line-height:1.7;'>{content}</div>"
+                        f"</div>",
+                        unsafe_allow_html=True
+                    )
+
+            # Export button
+            if st.button("📥 Copy Full Report", key="copy_report"):
+                report_text = f"LITERATURE REVIEW: {lr.get('disease_name','')}\n"
+                report_text += f"Generated: {lr.get('generated_at','')}\n\n"
+                for title, key in sections:
+                    content = lr.get(key,"")
+                    if content:
+                        report_text += f"{title}\n{content}\n\n"
+                st.code(report_text, language="")
+
+        else:
+            st.info(
+                "Literature review will appear here after analysis. "
+                "Run a disease analysis to generate a full report."
+            ) 
 
 
 # ── Empty states ──────────────────────────────────────────────

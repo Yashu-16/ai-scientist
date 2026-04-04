@@ -36,6 +36,8 @@ class Drug(BaseModel):
     fda_adverse_events: List[FDAAdverseEvent] = []
     risk_level:         str                   = "Unknown"
     risk_description:   str                   = ""
+    # V4 Feature 4
+    competition_intel:  Optional["CompetitionIntel"] = None
 
 
 # ── Research Paper ────────────────────────────────────────────
@@ -223,6 +225,65 @@ class FailurePrediction(BaseModel):
     success_probability:  float = 0.0  # Estimated probability of success
     recommended_safeguards: List[str] = []
 
+# ── Competition Intelligence ──────────────────────────────────
+class CompetitionIntel(BaseModel):
+    """
+    Market competition analysis for a drug-target combination.
+    Helps assess strategic positioning and market opportunity.
+    """
+    competition_level:   str   = ""    # "Low" / "Medium" / "High"
+    competition_color:   str   = ""    # Hex color
+    num_similar_drugs:   int   = 0     # Number of drugs in same class
+    similar_drug_names:  List[str] = []
+    market_opportunity:  str   = ""    # "Strong" / "Moderate" / "Crowded"
+    strategic_note:      str   = ""    # 1-sentence positioning note
+    drug_class:          str   = ""    # e.g. "Gamma-secretase inhibitor"
+
+# ── Time-to-Impact Prediction ─────────────────────────────────
+class TimeToImpact(BaseModel):
+    """
+    Estimates time from current stage to market/clinical impact.
+    Based on clinical phase, risk level, and historical benchmarks.
+    """
+    years_to_market:        float = 0.0   # Estimated years
+    years_range:            str   = ""    # e.g. "3–7 years"
+    current_stage:          str   = ""    # e.g. "Phase 4 / FDA Approved"
+    next_milestone:         str   = ""    # What needs to happen next
+    success_probability:    float = 0.0   # Overall probability to market
+    speed_category:         str   = ""    # "Fast" / "Medium" / "Slow"
+    speed_color:            str   = ""    # Hex color
+    timeline_breakdown:     List[str] = []  # Step-by-step timeline
+    key_bottlenecks:        List[str] = []
+
+
+# ── Executive Summary ─────────────────────────────────────────
+class ExecutiveSummary(BaseModel):
+    """
+    Non-technical 3-4 sentence summary for business stakeholders.
+    Answers: what, why it matters, what to do, what the risk is.
+    """
+    headline:           str = ""   # One punchy sentence
+    body:               str = ""   # 3-4 sentence summary
+    market_opportunity: str = ""   # Business value statement
+    bottom_line:        str = ""   # Single sentence call to action
+    audience_level:     str = ""   # "Executive" / "Investor" / "General"
+
+
+# ── Literature Review ─────────────────────────────────────────
+class LiteratureReview(BaseModel):
+    """
+    Structured research-style literature review report.
+    """
+    disease_name:       str = ""
+    background:         str = ""   # Disease overview
+    current_research:   str = ""   # State of the field
+    research_gaps:      str = ""   # What's missing
+    proposed_hypothesis:str = ""   # The hypothesis explained
+    supporting_evidence:str = ""   # Evidence summary
+    risks_limitations:  str = ""   # Known risks
+    conclusion:         str = ""   # Final assessment
+    generated_at:       str = ""   # Timestamp
+
 # ── Multi-Disease Comparison ──────────────────────────────────
 class DiseaseComparisonEntry(BaseModel):
     """Score for one drug across one disease."""
@@ -312,6 +373,9 @@ class Hypothesis(BaseModel):
     go_no_go:    Optional["GoNoGoDecision"]      = None
     # V4 Feature 3
     failure_prediction: Optional["FailurePrediction"]   = None
+    # V4 Features 5-7
+    time_to_impact:     Optional["TimeToImpact"]       = None
+    executive_summary:  Optional["ExecutiveSummary"]   = None
 
 
 # ── Full Analysis Result ──────────────────────────────────────
@@ -326,6 +390,8 @@ class DiseaseAnalysisResult(BaseModel):
     decision_summary:  Optional[DecisionSummary]  = None
     # V4 Feature 1
     analysis_uncertainty: Optional["UncertaintyAnalysis"] = None
+    # V4 Feature 7
+    literature_review:  Optional["LiteratureReview"]   = None
     analysis_status:   str                        = "pending"
     error_message:     str                        = ""
 

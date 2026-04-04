@@ -1,0 +1,102 @@
+{
+  "nodes": {
+    "APP": {
+      "type": "protein",
+      "protein_name": "amyloid beta precursor protein",
+      "diseases": [
+        "Alzheimer disease"
+      ],
+      "max_score": 0.8697,
+      "appearances": 1
+    },
+    "PSEN1": {
+      "type": "protein",
+      "protein_name": "presenilin 1",
+      "diseases": [
+        "Alzheimer disease"
+      ],
+      "max_score": 0.8663,
+      "appearances": 1
+    },
+    "PSEN2": {
+      "type": "protein",
+      "protein_name": "presenilin 2",
+      "diseases": [
+        "Alzheimer disease"
+      ],
+      "max_score": 0.8165,
+      "appearances": 1
+    },
+    "APOE": {
+      "type": "protein",
+      "protein_name": "apolipoprotein E",
+      "diseases": [
+        "Alzheimer disease"
+      ],
+      "max_score": 0.7749,
+      "appearances": 1
+    },
+    "GRIN1": {
+      "type": "protein",
+      "protein_name": "glutamate ionotropic receptor NMDA type subunit 1",
+      "diseases": [
+        "Alzheimer disease"
+      ],
+      "max_score": 0.7,
+      "appearances": 1
+    },
+    "LECANEMAB": {
+      "type": "drug",
+      "drug_name": "Lecanemab",
+      "drug_type": "Antibody",
+      "phase": 4,
+      "mechanism": "Amyloid beta aggregation inhibitor targeting APP cleavage products",
+      "risk_level": "Medium",
+      "appearances": 1
+    },
+    "SEMAGACESTAT": {
+      "type": "drug",
+      "drug_name": "Semagacestat",
+      "drug_type": "Small molecule",
+      "phase": 3,
+      "mechanism": "Gamma-secretase inhibitor \u2014 blocks PSEN1-mediated APP cleavage",
+      "risk_level": "Low",
+      "appearances": 1
+    }
+  },
+  "edges": [
+    {
+      "from": "LECANEMAB",
+      "to": "APP",
+      "relation": "targets",
+      "disease": "Alzheimer disease",
+      "score": 0.7479,
+      "added_at": "2026-04-04T09:39:47.143329"
+    },
+    {
+      "from": "SEMAGACESTAT",
+      "to": "PSEN1",
+      "relation": "targets",
+      "disease": "Alzheimer disease",
+      "score": 0.7115,
+      "added_at": "2026-04-04T09:39:47.143329"
+    }
+  ],
+  "disease_analyses": {
+    "Alzheimer disease": {
+      "last_analyzed": "2026-04-04T09:39:47.143329",
+      "top_drug": "Lecanemab",
+      "top_protein": "APP",
+      "confidence": 0.7479,
+      "decision": "GO"
+    }
+  },
+  "stats": {
+    "total_analyses": 1,
+    "total_proteins": 5,
+    "total_drugs": 2,
+    "total_edges": 2,
+    "created_at": "2026-04-04T09:37:36.259481",
+    "last_updated": "2026-04-04T09:39:47.144326"
+  }
+}

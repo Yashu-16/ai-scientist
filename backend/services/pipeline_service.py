@@ -677,6 +677,15 @@ def run_data_pipeline(
                 )
                 for ae in d.get("fda_adverse_events", [])
             ]
+            from backend.services.drug_service import classify_competition
+            from backend.models.schemas import CompetitionIntel
+
+            comp = classify_competition(
+                drug_name = d.get("drug_name",""),
+                mechanism = d.get("mechanism",""),
+                drug_type = d.get("drug_type","")
+            )
+
             result.drugs.append(Drug(
                 drug_name          = d.get("drug_name", ""),
                 drug_type          = d.get("drug_type", ""),
@@ -686,7 +695,8 @@ def run_data_pipeline(
                 target_gene        = d.get("target_gene", ""),
                 fda_adverse_events = fda_events,
                 risk_level         = d.get("risk_level", "Unknown"),
-                risk_description   = d.get("risk_description", "")
+                risk_description   = d.get("risk_description", ""),
+                competition_intel  = comp
             ))
 
     # Process paper results
