@@ -191,24 +191,26 @@ def generate_pdf_report(data: dict) -> bytes:
     best_hyp    = hypotheses[0] if hypotheses else {}
 
     # ── COVER / HEADER ────────────────────────────────────────
-    story.append(Spacer(1, 6*mm))
-    story.append(Paragraph("🧬 AI Scientist", styles["title"]))
+    story.append(Spacer(1, 8*mm))
+
+    # Title block — no emoji (ReportLab can't render them)
+    story.append(Paragraph("AI Scientist", styles["title"]))
+    story.append(Spacer(1, 2*mm))
     story.append(Paragraph(
-        "Decision & Risk Intelligence Platform for Drug Discovery",
+        "Decision &amp; Risk Intelligence Platform for Drug Discovery",
         styles["subtitle"]
     ))
-    story.append(Spacer(1, 3*mm))
+    story.append(Spacer(1, 4*mm))
     story.append(_divider(BLUE, 1.5))
+    story.append(Spacer(1, 3*mm))
 
-    # Report meta
+    # Report meta — plain text only
     now = datetime.now().strftime("%B %d, %Y at %H:%M")
     story.append(Paragraph(
-        f"<b>Disease:</b> {disease} &nbsp;&nbsp; "
-        f"<b>Generated:</b> {now} &nbsp;&nbsp; "
-        f"<b>Powered by:</b> GPT-4o-mini + OpenTargets + FDA FAERS",
+        f"Disease: {disease}     |     Generated: {now}     |     Powered by: GPT-4o-mini + OpenTargets + FDA FAERS",
         styles["caption"]
     ))
-    story.append(Spacer(1, 4*mm))
+    story.append(Spacer(1, 5*mm))
 
     # ── SECTION 1: EXECUTIVE DECISION ────────────────────────
     story.append(Paragraph("1. Executive Decision", styles["section"]))

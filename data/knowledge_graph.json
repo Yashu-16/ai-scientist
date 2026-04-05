@@ -7,7 +7,7 @@
         "Alzheimer disease"
       ],
       "max_score": 0.8697,
-      "appearances": 7
+      "appearances": 10
     },
     "PSEN1": {
       "type": "protein",
@@ -16,7 +16,7 @@
         "Alzheimer disease"
       ],
       "max_score": 0.8663,
-      "appearances": 7
+      "appearances": 10
     },
     "PSEN2": {
       "type": "protein",
@@ -25,7 +25,7 @@
         "Alzheimer disease"
       ],
       "max_score": 0.8165,
-      "appearances": 7
+      "appearances": 10
     },
     "APOE": {
       "type": "protein",
@@ -34,7 +34,7 @@
         "Alzheimer disease"
       ],
       "max_score": 0.7749,
-      "appearances": 7
+      "appearances": 10
     },
     "GRIN1": {
       "type": "protein",
@@ -43,7 +43,7 @@
         "Alzheimer disease"
       ],
       "max_score": 0.7,
-      "appearances": 7
+      "appearances": 10
     },
     "LECANEMAB": {
       "type": "drug",
@@ -52,7 +52,7 @@
       "phase": 4,
       "mechanism": "Amyloid beta aggregation inhibitor targeting APP cleavage products",
       "risk_level": "Medium",
-      "appearances": 7
+      "appearances": 10
     },
     "SEMAGACESTAT": {
       "type": "drug",
@@ -61,7 +61,52 @@
       "phase": 3,
       "mechanism": "Gamma-secretase inhibitor \u2014 blocks PSEN1-mediated APP cleavage",
       "risk_level": "Low",
-      "appearances": 7
+      "appearances": 10
+    },
+    "SOD1": {
+      "type": "protein",
+      "protein_name": "superoxide dismutase 1",
+      "diseases": [
+        "amyotrophic lateral sclerosis"
+      ],
+      "max_score": 0.8898,
+      "appearances": 1
+    },
+    "TARDBP": {
+      "type": "protein",
+      "protein_name": "TAR DNA binding protein",
+      "diseases": [
+        "amyotrophic lateral sclerosis"
+      ],
+      "max_score": 0.8549,
+      "appearances": 1
+    },
+    "FUS": {
+      "type": "protein",
+      "protein_name": "FUS RNA binding protein",
+      "diseases": [
+        "amyotrophic lateral sclerosis"
+      ],
+      "max_score": 0.8449,
+      "appearances": 1
+    },
+    "TBK1": {
+      "type": "protein",
+      "protein_name": "TANK binding kinase 1",
+      "diseases": [
+        "amyotrophic lateral sclerosis"
+      ],
+      "max_score": 0.8306,
+      "appearances": 1
+    },
+    "SQSTM1": {
+      "type": "protein",
+      "protein_name": "sequestosome 1",
+      "diseases": [
+        "amyotrophic lateral sclerosis"
+      ],
+      "max_score": 0.8233,
+      "appearances": 1
     }
   },
   "edges": [
@@ -88,23 +133,54 @@
       "disease": "Alzheimer disease",
       "score": 0.54,
       "added_at": "2026-04-04T09:57:48.332415"
+    },
+    {
+      "from": "GENE THERAPY",
+      "to": "SOD1",
+      "relation": "hypothesis_link",
+      "disease": "amyotrophic lateral sclerosis",
+      "score": 0.5359,
+      "added_at": "2026-04-05T15:56:21.542632"
+    },
+    {
+      "from": "GENE THERAPY",
+      "to": "TARDBP",
+      "relation": "hypothesis_link",
+      "disease": "amyotrophic lateral sclerosis",
+      "score": 0.522,
+      "added_at": "2026-04-05T15:56:21.542632"
+    },
+    {
+      "from": "INHIBITOR",
+      "to": "TBK1",
+      "relation": "hypothesis_link",
+      "disease": "amyotrophic lateral sclerosis",
+      "score": 0.5122,
+      "added_at": "2026-04-05T15:56:21.542632"
     }
   ],
   "disease_analyses": {
     "Alzheimer disease": {
-      "last_analyzed": "2026-04-04T11:28:50.905943",
+      "last_analyzed": "2026-04-05T15:35:07.426215",
       "top_drug": "Lecanemab",
       "top_protein": "APP",
-      "confidence": 0.7979,
+      "confidence": 0.7479,
       "decision": "GO"
+    },
+    "amyotrophic lateral sclerosis": {
+      "last_analyzed": "2026-04-05T15:56:21.542632",
+      "top_drug": "gene therapy",
+      "top_protein": "SOD1",
+      "confidence": 0.5359,
+      "decision": "INVESTIGATE"
     }
   },
   "stats": {
-    "total_analyses": 7,
-    "total_proteins": 5,
+    "total_analyses": 11,
+    "total_proteins": 10,
     "total_drugs": 2,
-    "total_edges": 3,
+    "total_edges": 6,
     "created_at": "2026-04-04T09:37:36.259481",
-    "last_updated": "2026-04-04T11:28:50.905943"
+    "last_updated": "2026-04-05T15:56:21.542632"
   }
 }
