@@ -11,7 +11,8 @@ from datetime import datetime
 from typing import Optional
 
 # ── Storage path ──────────────────────────────────────────────
-GRAPH_FILE = "data/knowledge_graph.json"
+import os
+GRAPH_FILE = os.getenv("GRAPH_FILE_PATH", "data/knowledge_graph.json")
 
 
 class KnowledgeGraph:

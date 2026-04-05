@@ -88,12 +88,21 @@ app = FastAPI(
 
 # ── CORS Middleware ──────────────────────────────────────────
 # Allows the Streamlit frontend (different port) to call this API
+import os
+
+ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://localhost:8501",
+    "https://*.vercel.app",
+    os.getenv("FRONTEND_URL", ""),
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins     = ["*"],   # In production: restrict to your domain
-    allow_credentials = True,
-    allow_methods     = ["*"],
-    allow_headers     = ["*"],
+    allow_origins=["*"],  # Keep * for now, restrict after deploy
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
