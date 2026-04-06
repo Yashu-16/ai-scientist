@@ -5,7 +5,7 @@ import { Building2 } from "lucide-react"
 import { usePathname } from "next/navigation"
 import {
   LayoutDashboard, FlaskConical, Lightbulb,
-  TrendingUp, FileText, Dna, Activity, Globe, CreditCard, History, UserCircle 
+  TrendingUp, FileText, Dna, Activity, Globe, CreditCard, History, UserCircle, Shield  
 } from "lucide-react"
 
 const nav = [
@@ -60,6 +60,13 @@ export function Sidebar() {
             Landing Page
           </Link>
         </div>
+        <div className="pt-2 border-t border-gray-100 mt-2">
+  <Link href="/admin"
+    className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-red-400 hover:bg-red-50 transition-all">
+    <Shield className="h-4 w-4 flex-shrink-0" />
+    Admin
+  </Link>
+</div>
       </nav>
 
       {/* Footer */}
