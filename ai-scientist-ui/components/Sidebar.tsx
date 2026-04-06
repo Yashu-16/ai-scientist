@@ -5,7 +5,7 @@ import { Building2 } from "lucide-react"
 import { usePathname } from "next/navigation"
 import {
   LayoutDashboard, FlaskConical, Lightbulb,
-  TrendingUp, FileText, Dna, Activity, Globe, CreditCard, History 
+  TrendingUp, FileText, Dna, Activity, Globe, CreditCard, History, UserCircle 
 } from "lucide-react"
 
 const nav = [
@@ -18,6 +18,7 @@ const nav = [
   { href: "/pricing", label: "Pricing",  icon: CreditCard },
   { href: "/billing", label: "Billing",  icon: CreditCard },
   { href: "/history", label: "History", icon: History },
+  { href: "/profile", label: "Profile", icon: UserCircle },
 ]
 
 export function Sidebar() {
