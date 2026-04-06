@@ -1,21 +1,22 @@
 "use client"
-// components/AppShell.tsx
-// Renders sidebar+navbar for app routes, plain layout for landing page
-
 import { usePathname } from "next/navigation"
 import { Sidebar } from "./Sidebar"
 import { Navbar }  from "./Navbar"
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const isLanding = pathname === "/landing"
-  const isAuth    = pathname.startsWith("/auth")
 
-  if (isLanding || isAuth) {
+  // Full-page routes — no sidebar, no navbar
+  const isPublicPage =
+    pathname === "/" ||
+    pathname === "/landing" ||
+    pathname.startsWith("/auth")
+
+  if (isPublicPage) {
     return <>{children}</>
   }
 
-  // App pages: sidebar + navbar + content area
+  // App routes — show sidebar + navbar
   return (
     <div className="bg-gray-50 min-h-screen">
       <Sidebar />

@@ -1,319 +1,288 @@
 "use client"
-// app/page.tsx — Dashboard
-import { useAnalysis } from "../lib/hooks"
-import { Card, StatCard, Spinner, EmptyState, Badge, riskVariant, evidenceVariant, ScoreBar } from "../components/ui"
-import { GoNoBadge, GoNoGoCard } from "../components/ui/GoNoBadge"
-import { FlaskConical, ChevronRight, Lightbulb, TrendingUp, FileText, Clock, AlertTriangle } from "lucide-react"
+// app/landing/page.tsx — Marketing landing page
 import Link from "next/link"
+import { useState, useEffect } from "react"
+import { loadAnalysis } from "@/lib/store"
+import {
+  FlaskConical, Dna, TrendingUp, Shield,
+  ChevronRight, Activity, BarChart2,
+  FileText, MessageSquare, RefreshCw, Zap, Star
+} from "lucide-react"
 
-export default function DashboardPage() {
-  const { data, hydrated } = useAnalysis()
+const DISEASES_CYCLE = [
+  "Alzheimer disease", "Parkinson disease", "breast cancer",
+  "type 2 diabetes", "rheumatoid arthritis", "lung cancer",
+]
 
-  if (!hydrated) return (
-    <div className="flex items-center justify-center min-h-[60vh]">
-      <Spinner size="lg" />
-    </div>
-  )
+const FEATURES = [
+  { icon: Dna,           title: "9-Stage Analysis Pipeline",   desc: "Protein targets, drug mapping, causal reasoning, hypothesis generation — all automated via OpenTargets, FDA FAERS, PubMed, and GPT-4o-mini.", color: "bg-blue-50 text-blue-600" },
+  { icon: Shield,        title: "GO / NO-GO Decision Engine",  desc: "Quantified confidence scores with supporting and blocking factors. Know exactly why a hypothesis is recommended or rejected.",             color: "bg-emerald-50 text-emerald-600" },
+  { icon: TrendingUp,    title: "Failure Prediction",          desc: "AI-powered failure risk scoring with historical context, predicted failure modes, and recommended safeguards before you invest.",          color: "bg-purple-50 text-purple-600" },
+  { icon: RefreshCw,     title: "Drug Repurposing",            desc: "Find new disease indications for existing drugs. Mechanistic analysis with shared pathways and evidence levels.",                           color: "bg-amber-50 text-amber-600" },
+  { icon: MessageSquare, title: "AI Scientist Chat",           desc: "Ask anything about your analysis. Context-aware answers referencing actual scores, proteins, drugs, and evidence.",                       color: "bg-pink-50 text-pink-600" },
+  { icon: FileText,      title: "PDF Research Reports",        desc: "Professional 9-section reports with executive decision, evidence analysis, risk tables, and hypothesis comparison.",                       color: "bg-slate-50 text-slate-600" },
+]
 
-  if (!data) return (
-    <div className="max-w-5xl mx-auto">
-      <EmptyState
-        icon={<FlaskConical className="h-16 w-16" />}
-        title="No analysis yet"
-        subtitle="Run an analysis to see the decision intelligence dashboard with GO/NO-GO recommendations, protein targets, drug risk profiles, and more."
-        action={
-          <Link href="/analysis" className="inline-flex items-center gap-2 bg-blue-600 text-white text-sm font-medium px-5 py-2.5 rounded-lg hover:bg-blue-700 transition-colors">
-            <FlaskConical className="h-4 w-4" />
-            Run First Analysis
-          </Link>
-        }
-      />
+const STATS = [
+  { value:"19+", label:"API Endpoints" },
+  { value:"10",  label:"Analysis Tabs" },
+  { value:"6",   label:"LLM Passes/Run" },
+  { value:"5",   label:"Scientific APIs" },
+]
 
-      {/* Examples */}
-      <div className="mt-8">
-        <h3 className="text-sm font-semibold text-gray-500 mb-3">💡 Try These Examples</h3>
-        <div className="grid grid-cols-4 gap-3">
-          {[
-            { emoji:"🧠", name:"Alzheimer disease",    desc:"Amyloid cascade, gamma-secretase" },
-            { emoji:"🫀", name:"Parkinson disease",    desc:"Alpha-synuclein, dopamine pathway" },
-            { emoji:"🎗️", name:"breast cancer",        desc:"HER2, BRCA1, hormone receptors" },
-            { emoji:"🩸", name:"type 2 diabetes",      desc:"Insulin resistance, GLUT4 pathway" },
-          ].map(({ emoji, name, desc }) => (
-            <Link
-              key={name}
-              href={`/analysis?disease=${encodeURIComponent(name)}`}
-              className="bg-white border border-gray-200 rounded-xl p-4 text-center hover:border-blue-200 hover:bg-blue-50 transition-all group"
-            >
-              <div className="text-2xl mb-2">{emoji}</div>
-              <p className="text-sm font-medium text-gray-800 group-hover:text-blue-700">{name}</p>
-              <p className="text-xs text-gray-400 mt-1">{desc}</p>
-            </Link>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
+const PIPELINE = [
+  "Protein targets","Drug mapping","FDA signals",
+  "Paper retrieval","Causal reasoning","Hypotheses",
+  "GO/NO-GO","Failure prediction","Exec summary"
+]
 
-  const ds  = data.decision_summary
-  const ev  = data.evidence_strength
-  const au  = data.analysis_uncertainty
-  const gng = ds?.go_no_go
-  const best = data.hypotheses?.[0]
-  const fp  = best?.failure_prediction
-  const tti = best?.time_to_impact
+export default function LandingPage() {
+  const [diseaseIdx, setDiseaseIdx] = useState(0)
+  const [hasAnalysis, setHasAnalysis] = useState(false)
+
+  useEffect(() => {
+    setHasAnalysis(!!loadAnalysis())
+    const iv = setInterval(() => setDiseaseIdx(i => (i+1) % DISEASES_CYCLE.length), 2200)
+    return () => clearInterval(iv)
+  }, [])
 
   return (
-    <div className="max-w-6xl mx-auto space-y-5">
+    <div className="min-h-screen bg-white overflow-x-hidden">
 
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">{data.disease_name}</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Decision Intelligence Report · V5</p>
+      {/* NAV */}
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100">
+        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="h-8 w-8 rounded-lg bg-blue-600 flex items-center justify-center">
+              <Dna className="h-4 w-4 text-white" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-gray-900 leading-none">AI Scientist</p>
+              <p className="text-[10px] text-gray-400">Drug Discovery V5</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <a href="http://localhost:8000/docs" target="_blank" rel="noopener noreferrer"
+               className="text-sm text-gray-500 hover:text-gray-800 transition-colors hidden sm:block">
+              API Docs
+            </a>
+            <Link href={hasAnalysis ? "/dashboard" : "/analysis"}
+              className="flex items-center gap-1.5 text-sm font-bold bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors shadow-sm">
+              <FlaskConical className="h-3.5 w-3.5" />
+              {hasAnalysis ? "Open App" : "Get Started"}
+            </Link>
+          </div>
         </div>
-        <Link href="/analysis" className="inline-flex items-center gap-2 text-sm bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium">
-          <FlaskConical className="h-4 w-4" />
-          New Analysis
-        </Link>
-      </div>
+      </nav>
 
-      {/* Hero GO/NO-GO card */}
-      <Card padding="none" className="overflow-hidden border-0 shadow-lg">
-        <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6">
-          <div className="flex items-start justify-between gap-6">
-            <div className="flex-1 space-y-4">
-              <div>
-                <p className="text-slate-400 text-xs font-medium uppercase tracking-widest mb-2">Final Decision</p>
-                {gng && <GoNoBadge decision={gng.decision} confidence={gng.confidence_in_decision} size="lg" />}
-              </div>
-              <div>
-                <p className="text-slate-400 text-xs mb-1">Best Recommendation</p>
-                <p className="text-white text-lg font-semibold leading-snug max-w-xl">{ds?.best_hypothesis}</p>
-              </div>
-              {gng?.primary_reason && (
-                <div className="bg-white/10 rounded-lg px-4 py-3 text-slate-300 text-sm max-w-xl">
-                  📋 {gng.primary_reason}
-                </div>
-              )}
-            </div>
-            <div className="flex-shrink-0 space-y-4 text-right min-w-[180px]">
-              <div>
-                <p className="text-slate-400 text-xs">Recommended Drug</p>
-                <p className="text-white font-bold text-xl">{ds?.recommended_drug}</p>
-              </div>
-              <div>
-                <p className="text-slate-400 text-xs">Target Protein</p>
-                <p className="text-white font-semibold text-lg">{ds?.target_protein}</p>
-              </div>
-              <div>
-                <p className="text-slate-400 text-xs">Confidence</p>
-                <p className="text-white font-bold text-2xl">{Math.round((ds?.confidence_score ?? 0)*100)}%</p>
-              </div>
-              <div>
-                <p className="text-slate-400 text-xs">Risk Level</p>
-                <p className={`font-bold text-lg ${ds?.risk_level === "High" ? "text-red-400" : ds?.risk_level === "Medium" ? "text-amber-400" : "text-emerald-400"}`}>
-                  {ds?.risk_level === "High" ? "🔴" : ds?.risk_level === "Medium" ? "🟡" : "🟢"} {ds?.risk_level}
-                </p>
+      {/* HERO */}
+      <section className="pt-36 pb-24 px-6 relative overflow-hidden">
+        {/* Background blur orbs */}
+        <div className="absolute top-20 left-1/4 w-96 h-96 bg-blue-100 rounded-full blur-3xl opacity-40 -z-10" />
+        <div className="absolute top-40 right-1/4 w-72 h-72 bg-purple-100 rounded-full blur-3xl opacity-30 -z-10" />
+
+        <div className="max-w-4xl mx-auto text-center">
+          <div className="inline-flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-full px-4 py-1.5 mb-6">
+            <span className="flex h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
+            <span className="text-xs font-bold text-blue-700 uppercase tracking-wide">V5 · Decision & Risk Intelligence Platform</span>
+          </div>
+
+          <h1 className="text-5xl sm:text-6xl font-black text-gray-900 leading-tight mb-4 tracking-tight">
+            Drug Discovery<br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-purple-600 to-blue-800">
+              Powered by AI
+            </span>
+          </h1>
+
+          <div className="flex items-center justify-center gap-2 mb-6">
+            <span className="text-xl text-gray-400">Analyzing</span>
+            <div className="overflow-hidden h-9 min-w-[220px] text-left">
+              <div className="transition-transform duration-500 ease-in-out"
+                   style={{ transform: `translateY(-${diseaseIdx * 36}px)` }}>
+                {DISEASES_CYCLE.map(d => (
+                  <p key={d} className="h-9 flex items-center text-xl font-black text-blue-600">{d}</p>
+                ))}
               </div>
             </div>
           </div>
 
-          {/* Supporting / Blocking */}
-          {(gng?.supporting_reasons?.length > 0 || gng?.blocking_reasons?.length > 0) && (
-            <div className="mt-5 pt-5 border-t border-slate-700 grid grid-cols-2 gap-4">
-              {gng?.supporting_reasons?.length > 0 && (
-                <div>
-                  <p className="text-emerald-400 text-xs font-semibold mb-2">✅ Supporting Factors</p>
-                  <ul className="space-y-1">
-                    {gng.supporting_reasons.map((r, i) => (
-                      <li key={i} className="text-slate-300 text-xs bg-emerald-900/20 rounded px-2 py-1">• {r}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {gng?.blocking_reasons?.length > 0 && (
-                <div>
-                  <p className="text-red-400 text-xs font-semibold mb-2">❌ Blocking Factors</p>
-                  <ul className="space-y-1">
-                    {gng.blocking_reasons.map((r, i) => (
-                      <li key={i} className="text-slate-300 text-xs bg-red-900/20 rounded px-2 py-1">• {r}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          )}
+          <p className="text-lg text-gray-500 max-w-2xl mx-auto leading-relaxed mb-10">
+            A production-grade biomedical AI platform that analyzes protein targets, drug interactions,
+            and research literature — delivering a quantified GO/NO-GO recommendation in under 90 seconds.
+          </p>
 
-          {/* Recommended action */}
-          {gng?.recommended_action && (
-            <div className="mt-4 bg-emerald-900/30 border border-emerald-700/50 rounded-lg px-4 py-2.5 text-sm text-emerald-300">
-              🚀 <strong>Recommended Action:</strong> {gng.recommended_action}
-            </div>
-          )}
+          <div className="flex items-center justify-center flex-wrap gap-3">
+            <Link href="/analysis"
+              className="flex items-center gap-2 bg-blue-600 text-white px-8 py-3.5 rounded-xl font-black text-sm hover:bg-blue-700 transition-all shadow-lg hover:shadow-blue-200 hover:-translate-y-0.5">
+              <Zap className="h-4 w-4" />
+              {hasAnalysis ? "Run New Analysis" : "Start Free Analysis"}
+              <ChevronRight className="h-4 w-4" />
+            </Link>
+            {hasAnalysis && (
+              <Link href="/"
+                className="flex items-center gap-2 bg-white border-2 border-gray-200 text-gray-700 px-6 py-3 rounded-xl font-bold text-sm hover:border-blue-300 hover:text-blue-700 transition-all">
+                <BarChart2 className="h-4 w-4" />
+                View Dashboard
+              </Link>
+            )}
+          </div>
+
+          <p className="text-gray-400 text-xs mt-5">No signup required · Runs locally · FastAPI + GPT-4o-mini</p>
         </div>
-      </Card>
+      </section>
 
-      {/* Stats row */}
-      <div className="grid grid-cols-4 gap-3">
-        <StatCard label="🧬 Proteins"   value={data.protein_targets?.length ?? 0} color="blue" sub="from OpenTargets" />
-        <StatCard label="💊 Drugs"      value={data.drugs?.length ?? 0}           color="green" sub="FDA data mapped" />
-        <StatCard label="📚 Papers"     value={data.papers?.length ?? 0}          sub="PubMed + Semantic Scholar" />
-        <StatCard label="💡 Hypotheses" value={data.hypotheses?.length ?? 0}      color="purple" sub="GPT-4o-mini generated" />
-      </div>
-
-      {/* Insight cards */}
-      <div className="grid grid-cols-3 gap-4">
-
-        {/* Uncertainty */}
-        <Card padding="md">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-gray-700">Analysis Reliability</h3>
-            <AlertTriangle className="h-4 w-4 text-gray-300" />
+      {/* PIPELINE */}
+      <section className="py-20 px-6 bg-gray-950">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-10">
+            <p className="text-xs font-bold text-blue-400 uppercase tracking-widest mb-2">Automated 9-Stage Pipeline</p>
+            <h2 className="text-3xl font-black text-white">Disease name → GO/NO-GO in &lt;90 seconds</h2>
           </div>
-          <p className="text-2xl font-bold text-gray-900">{au?.uncertainty_label ?? "—"}</p>
-          <p className="text-xs text-gray-400 mt-0.5">uncertainty</p>
-          <p className="text-xs text-gray-500 mt-2 leading-relaxed line-clamp-2">{au?.uncertainty_reason}</p>
-          {au && (
-            <div className="mt-3 bg-gray-100 rounded-full h-1.5">
-              <div className={`h-1.5 rounded-full ${au.uncertainty_label === "Low" ? "bg-emerald-500" : au.uncertainty_label === "Medium" ? "bg-amber-500" : "bg-red-500"}`}
-                style={{ width:`${(au.uncertainty_score ?? 0)*100}%` }} />
-            </div>
-          )}
-        </Card>
 
-        {/* Failure risk */}
-        <Card padding="md">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-gray-700">Failure Risk</h3>
-            <TrendingUp className="h-4 w-4 text-gray-300" />
-          </div>
-          {fp ? (
-            <>
-              <div className="flex items-end gap-2">
-                <p className="text-2xl font-bold text-gray-900">{fp.failure_risk_label}</p>
-                <p className="text-sm text-gray-400 mb-0.5">{Math.round((fp.failure_risk_score ?? 0)*100)}%</p>
-              </div>
-              <p className="text-xs text-gray-500 mt-1">
-                Success: <span className={`font-semibold ${(fp.success_probability ?? 0) >= 0.7 ? "text-emerald-600" : (fp.success_probability ?? 0) >= 0.4 ? "text-amber-600" : "text-red-600"}`}>
-                  {Math.round((fp.success_probability ?? 0)*100)}%
-                </span>
-              </p>
-              <p className="text-xs text-gray-400 mt-1 leading-relaxed line-clamp-2">{fp.top_failure_reason}</p>
-            </>
-          ) : <p className="text-gray-400 text-sm">Run analysis first</p>}
-        </Card>
-
-        {/* Time to market */}
-        <Card padding="md">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-gray-700">Time to Market</h3>
-            <Clock className="h-4 w-4 text-gray-300" />
-          </div>
-          {tti ? (
-            <>
-              <p className="text-2xl font-bold text-gray-900">{tti.years_range}</p>
-              <p className="text-xs text-gray-400 mt-0.5">{tti.speed_category} track</p>
-              <p className="text-xs text-gray-500 mt-1">{tti.current_stage}</p>
-              <p className="text-xs text-gray-400 mt-1">
-                {Math.round((tti.success_probability ?? 0)*100)}% success probability
-              </p>
-            </>
-          ) : <p className="text-gray-400 text-sm">Run analysis first</p>}
-        </Card>
-      </div>
-
-      {/* Evidence + Risk row */}
-      <div className="grid grid-cols-2 gap-4">
-        <Card padding="md">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-gray-900">Evidence Strength</h3>
-            {ev && <Badge label={ev.evidence_label} variant={evidenceVariant(ev.evidence_label)} />}
-          </div>
-          {ev && (
-            <div className="space-y-2">
-              {[
-                { label:"Score",          value:`${ev.evidence_score?.toFixed(2)}/1.00` },
-                { label:"Total Papers",   value:ev.total_papers },
-                { label:"Recent Papers",  value:ev.recent_papers },
-                { label:"Highly Cited",   value:ev.high_citation_papers },
-              ].map(({ label, value }) => (
-                <div key={label} className="flex justify-between items-center py-1.5 border-b border-gray-50 last:border-0">
-                  <span className="text-xs text-gray-500">{label}</span>
-                  <span className="text-xs font-semibold text-gray-800">{value}</span>
+          <div className="flex items-start justify-center flex-wrap gap-2">
+            {PIPELINE.map((stage, i) => (
+              <div key={stage} className="flex items-center gap-2">
+                <div className="flex flex-col items-center text-center">
+                  <div className="w-11 h-11 rounded-full bg-blue-600/20 border border-blue-500/50 flex items-center justify-center text-blue-300 text-sm font-bold mb-2 hover:bg-blue-600/40 transition-colors">
+                    {i+1}
+                  </div>
+                  <p className="text-[11px] text-gray-400 max-w-[72px] leading-snug">{stage}</p>
                 </div>
-              ))}
-            </div>
-          )}
-        </Card>
-
-        <Card padding="md">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-gray-900">Drug Risk Profile</h3>
-            {ds?.risk_level && <Badge label={ds.risk_level} variant={riskVariant(ds.risk_level)} />}
-          </div>
-          <div className="space-y-3">
-            {data.drugs?.slice(0,3).map(drug => (
-              <div key={drug.drug_name} className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-900">{drug.drug_name}</p>
-                  <p className="text-xs text-gray-400">Phase {drug.clinical_phase} · {drug.target_gene}</p>
-                </div>
-                <Badge label={drug.risk_level} variant={riskVariant(drug.risk_level)} size="sm" />
+                {i < PIPELINE.length-1 && <div className="w-5 h-px bg-blue-800 mb-5 flex-shrink-0" />}
               </div>
             ))}
           </div>
-        </Card>
-      </div>
 
-      {/* Top hypothesis summary */}
-      {best && (
-        <Card padding="md">
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">🥇 Top Hypothesis Summary</h3>
-          <div className="flex items-start gap-4">
-            <div className="flex-1">
-              <p className="text-sm font-medium text-gray-800">{best.title}</p>
-              <p className="text-xs text-gray-500 mt-2 leading-relaxed line-clamp-3">{best.explanation}</p>
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                {best.key_proteins?.map(p => <span key={p} className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">{p}</span>)}
-                {best.key_drugs?.map(d => <span key={d} className="text-xs bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full">{d}</span>)}
+          <div className="grid grid-cols-4 gap-4 mt-14">
+            {STATS.map(({ value, label }) => (
+              <div key={label} className="bg-white/5 border border-white/10 rounded-2xl p-5 text-center hover:bg-white/10 transition-colors">
+                <p className="text-4xl font-black text-white mb-1">{value}</p>
+                <p className="text-xs text-gray-400">{label}</p>
               </div>
-            </div>
-            <div className="flex-shrink-0 text-center">
-              <p className={`text-3xl font-black ${(best.final_score ?? 0) >= 0.8 ? "text-emerald-600" : (best.final_score ?? 0) >= 0.6 ? "text-amber-600" : "text-red-600"}`}>
-                {Math.round((best.final_score ?? best.confidence_score) * 100)}%
-              </p>
-              <p className="text-xs text-gray-400">composite score</p>
-              {best.go_no_go && <div className="mt-2"><GoNoBadge decision={best.go_no_go.decision} size="sm" /></div>}
-            </div>
+            ))}
           </div>
-        </Card>
-      )}
+        </div>
+      </section>
 
-      {/* Quick nav */}
-      <div className="grid grid-cols-3 gap-3">
-        {[
-          { href:"/hypotheses", label:"View All Hypotheses", desc:"Detailed analysis with GO/NO-GO", icon:Lightbulb },
-          { href:"/insights",   label:"Trends & Repurposing", desc:"Emerging opportunities", icon:TrendingUp },
-          { href:"/report",     label:"Download Report", desc:"PDF export + AI chat", icon:FileText },
-        ].map(({ href, label, desc, icon:Icon }) => (
-          <Link
-            key={href}
-            href={href}
-            className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-xl hover:border-blue-200 hover:bg-blue-50 transition-all group"
-          >
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 group-hover:bg-blue-100 transition-colors">
-                <Icon className="h-4 w-4 text-gray-500 group-hover:text-blue-600" />
+      {/* FEATURES */}
+      <section className="py-20 px-6 bg-white">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-12">
+            <p className="text-xs font-bold text-blue-600 uppercase tracking-widest mb-2">Full feature set</p>
+            <h2 className="text-3xl font-black text-gray-900">Not a wrapper. A platform.</h2>
+            <p className="text-gray-500 mt-3 max-w-xl mx-auto text-sm leading-relaxed">
+              Unlike simple LLM wrappers, AI Scientist runs a real 9-stage scientific pipeline with 5 live APIs,
+              quantified scoring, persistent knowledge graphs, and professional PDF export.
+            </p>
+          </div>
+          <div className="grid grid-cols-3 gap-5">
+            {FEATURES.map(({ icon:Icon, title, desc, color }) => (
+              <div key={title} className="bg-white border border-gray-100 rounded-2xl p-6 hover:border-blue-200 hover:shadow-lg hover:shadow-blue-50/80 transition-all group cursor-default">
+                <div className={`w-11 h-11 rounded-xl flex items-center justify-center mb-4 ${color}`}>
+                  <Icon className="h-5 w-5" />
+                </div>
+                <h3 className="text-sm font-bold text-gray-900 mb-2 group-hover:text-blue-700 transition-colors">{title}</h3>
+                <p className="text-xs text-gray-500 leading-relaxed">{desc}</p>
               </div>
-              <div>
-                <p className="text-sm font-semibold text-gray-900">{label}</p>
-                <p className="text-xs text-gray-400">{desc}</p>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* DATA SOURCES */}
+      <section className="py-16 px-6 bg-gray-50">
+        <div className="max-w-4xl mx-auto text-center">
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-8">Powered by real scientific APIs</p>
+          <div className="flex flex-wrap items-stretch justify-center gap-3">
+            {[
+              { name:"OpenTargets",      sub:"Protein targets",       color:"bg-blue-600" },
+              { name:"FDA FAERS",        sub:"Adverse events",        color:"bg-red-600" },
+              { name:"PubMed",           sub:"Literature",            color:"bg-green-600" },
+              { name:"Semantic Scholar", sub:"Paper summaries",       color:"bg-purple-600" },
+              { name:"AlphaFold",        sub:"Structural confidence", color:"bg-amber-600" },
+              { name:"GPT-4o-mini",      sub:"Hypothesis generation", color:"bg-slate-700" },
+            ].map(({ name, sub, color }) => (
+              <div key={name} className="bg-white border border-gray-200 rounded-xl px-5 py-4 text-center shadow-sm hover:shadow-md hover:border-gray-300 transition-all min-w-[140px]">
+                <div className={`w-3 h-3 rounded-full ${color} mx-auto mb-2`} />
+                <p className="text-sm font-bold text-gray-800">{name}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{sub}</p>
               </div>
-            </div>
-            <ChevronRight className="h-4 w-4 text-gray-300 group-hover:text-blue-500" />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* TABS PREVIEW */}
+      <section className="py-20 px-6 bg-white">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-10">
+            <p className="text-xs font-bold text-blue-600 uppercase tracking-widest mb-2">10 analysis tabs</p>
+            <h2 className="text-3xl font-black text-gray-900">Every angle of drug discovery covered</h2>
+          </div>
+          <div className="grid grid-cols-5 gap-3">
+            {[
+              { icon:"💡", label:"Hypotheses",      desc:"Ranked + GO/NO-GO" },
+              { icon:"🧬", label:"Proteins",        desc:"OpenTargets + AlphaFold" },
+              { icon:"💊", label:"Drugs",           desc:"FDA + Competition" },
+              { icon:"⚠️", label:"Risk Analysis",   desc:"Adverse events" },
+              { icon:"🕸️", label:"Network",         desc:"Interactive graph" },
+              { icon:"📡", label:"Live Updates",    desc:"Daily PubMed" },
+              { icon:"📄", label:"Literature",      desc:"AI-generated review" },
+              { icon:"🤖", label:"Ask AI",          desc:"Context-aware chat" },
+              { icon:"🔥", label:"Trends",          desc:"Emerging signals" },
+              { icon:"🔁", label:"Repurpose",       desc:"New indications" },
+            ].map(({ icon, label, desc }) => (
+              <div key={label} className="bg-gray-50 border border-gray-100 rounded-xl p-4 text-center hover:border-blue-200 hover:bg-blue-50 transition-all cursor-default group">
+                <div className="text-2xl mb-2">{icon}</div>
+                <p className="text-xs font-bold text-gray-800 group-hover:text-blue-700 transition-colors">{label}</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">{desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* CTA BOTTOM */}
+      <section className="py-24 px-6 bg-gradient-to-br from-blue-600 to-blue-900 relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-500/20 to-transparent" />
+        <div className="max-w-2xl mx-auto text-center relative">
+          <div className="flex justify-center gap-1 mb-5">
+            {[...Array(5)].map((_,i) => (
+              <Star key={i} className="h-5 w-5 text-yellow-300 fill-yellow-300" />
+            ))}
+          </div>
+          <h2 className="text-4xl font-black text-white mb-4 leading-tight">
+            Ready to discover your next drug candidate?
+          </h2>
+          <p className="text-blue-200 mb-10 leading-relaxed">
+            Enter any disease name and get a full GO/NO-GO recommendation with protein targets,
+            drug risk profiles, failure predictions, and a downloadable PDF report — all in under 90 seconds.
+          </p>
+          <Link href="/analysis"
+            className="inline-flex items-center gap-2 bg-white text-blue-700 px-10 py-4 rounded-2xl font-black text-base hover:bg-blue-50 transition-all shadow-2xl hover:-translate-y-1 active:translate-y-0">
+            <FlaskConical className="h-5 w-5" />
+            Start Free Analysis
+            <ChevronRight className="h-5 w-5" />
           </Link>
-        ))}
+          <p className="text-blue-300 text-xs mt-5">No signup · Runs locally · FastAPI + GPT-4o-mini + Next.js</p>
+        </div>
+      </section>
+
+      {/* FOOTER */}
+      <footer className="py-8 px-6 bg-gray-950 border-t border-gray-800">
+      <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
+        <span>FastAPI + Next.js + GPT-4o-mini</span>
+        <span>·</span>
+        <a href="/terms"   className="hover:text-gray-300 transition-colors">Terms</a>
+        <span>·</span>
+        <a href="/privacy" className="hover:text-gray-300 transition-colors">Privacy</a>
+        <span>·</span>
+        <span>For exploratory research only. Not for clinical use.</span>
+        <span>·</span>
+        <a href="http://localhost:8000/docs" target="_blank" rel="noopener noreferrer"
+        className="hover:text-gray-300 transition-colors">API Docs →</a>
       </div>
+      </footer>
     </div>
   )
 }

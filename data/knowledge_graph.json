@@ -7,7 +7,7 @@
         "Alzheimer disease"
       ],
       "max_score": 0.8697,
-      "appearances": 10
+      "appearances": 11
     },
     "PSEN1": {
       "type": "protein",
@@ -16,7 +16,7 @@
         "Alzheimer disease"
       ],
       "max_score": 0.8663,
-      "appearances": 10
+      "appearances": 11
     },
     "PSEN2": {
       "type": "protein",
@@ -25,7 +25,7 @@
         "Alzheimer disease"
       ],
       "max_score": 0.8165,
-      "appearances": 10
+      "appearances": 11
     },
     "APOE": {
       "type": "protein",
@@ -34,7 +34,7 @@
         "Alzheimer disease"
       ],
       "max_score": 0.7749,
-      "appearances": 10
+      "appearances": 11
     },
     "GRIN1": {
       "type": "protein",
@@ -43,7 +43,7 @@
         "Alzheimer disease"
       ],
       "max_score": 0.7,
-      "appearances": 10
+      "appearances": 11
     },
     "LECANEMAB": {
       "type": "drug",
@@ -52,7 +52,7 @@
       "phase": 4,
       "mechanism": "Amyloid beta aggregation inhibitor targeting APP cleavage products",
       "risk_level": "Medium",
-      "appearances": 10
+      "appearances": 11
     },
     "SEMAGACESTAT": {
       "type": "drug",
@@ -61,7 +61,7 @@
       "phase": 3,
       "mechanism": "Gamma-secretase inhibitor \u2014 blocks PSEN1-mediated APP cleavage",
       "risk_level": "Low",
-      "appearances": 10
+      "appearances": 11
     },
     "SOD1": {
       "type": "protein",
@@ -161,7 +161,7 @@
   ],
   "disease_analyses": {
     "Alzheimer disease": {
-      "last_analyzed": "2026-04-05T15:35:07.426215",
+      "last_analyzed": "2026-04-06T17:39:59.457048",
       "top_drug": "Lecanemab",
       "top_protein": "APP",
       "confidence": 0.7479,
@@ -176,11 +176,11 @@
     }
   },
   "stats": {
-    "total_analyses": 11,
+    "total_analyses": 12,
     "total_proteins": 10,
     "total_drugs": 2,
     "total_edges": 6,
     "created_at": "2026-04-04T09:37:36.259481",
-    "last_updated": "2026-04-05T15:56:21.542632"
+    "last_updated": "2026-04-06T17:39:59.482753"
   }
 }

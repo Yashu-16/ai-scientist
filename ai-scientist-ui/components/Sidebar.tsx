@@ -5,20 +5,20 @@ import { Building2 } from "lucide-react"
 import { usePathname } from "next/navigation"
 import {
   LayoutDashboard, FlaskConical, Lightbulb,
-  TrendingUp, FileText, Dna, Activity, Globe, CreditCard, History, UserCircle, Shield  
+  TrendingUp, FileText, Dna, Activity, CreditCard, History, UserCircle, Shield  
 } from "lucide-react"
 
 const nav = [
-  { href:"/",           label:"Dashboard",     icon:LayoutDashboard },
-  { href:"/analysis",   label:"Analysis",      icon:FlaskConical },
-  { href:"/hypotheses", label:"All 10 Tabs",   icon:Lightbulb },
-  { href:"/insights",   label:"Insights",      icon:TrendingUp },
-  { href:"/report",     label:"Report & Chat", icon:FileText },
-  { href:"/org/dashboard", label:"Organization", icon:Building2 },
-  { href: "/pricing", label: "Pricing",  icon: CreditCard },
-  { href: "/billing", label: "Billing",  icon: CreditCard },
-  { href: "/history", label: "History", icon: History },
-  { href: "/profile", label: "Profile", icon: UserCircle },
+  { href: "/dashboard", label: "Dashboard",    icon: LayoutDashboard },
+  { href: "/analysis",  label: "Analysis",     icon: FlaskConical    },
+  { href: "/hypotheses",label: "All 10 Tabs",  icon: Lightbulb       },
+  { href: "/insights",  label: "Insights",     icon: TrendingUp      },
+  { href: "/report",    label: "Report & Chat",icon: FileText        },
+  { href: "/org/dashboard", label: "Organization", icon: Building2   },
+  { href: "/pricing",   label: "Pricing",      icon: CreditCard      },
+  { href: "/billing",   label: "Billing",      icon: CreditCard      },
+  { href: "/history",   label: "History",      icon: History         },
+  { href: "/profile",   label: "Profile",      icon: UserCircle      },
 ]
 
 export function Sidebar() {
@@ -52,21 +52,6 @@ export function Sidebar() {
             </Link>
           )
         })}
-
-        <div className="pt-2 border-t border-gray-100 mt-2">
-          <Link href="/landing"
-            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:bg-gray-50 hover:text-gray-600 transition-all">
-            <Globe className="h-4 w-4 flex-shrink-0" />
-            Landing Page
-          </Link>
-        </div>
-        <div className="pt-2 border-t border-gray-100 mt-2">
-  <Link href="/admin"
-    className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-red-400 hover:bg-red-50 transition-all">
-    <Shield className="h-4 w-4 flex-shrink-0" />
-    Admin
-  </Link>
-</div>
       </nav>
 
       {/* Footer */}

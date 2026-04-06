@@ -9,7 +9,7 @@ import { Suspense } from "react"
 function LoginForm() {
   const router = useRouter()
   const params = useSearchParams()
-  const callbackUrl = params.get("callbackUrl") ?? "/"
+  const callbackUrl = params.get("callbackUrl") ?? "/dashboard"
   const verified    = params.get("verified")
   const registered  = params.get("registered")
 

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { analyzeDisease, getExampleDiseases } from "@/lib/api"
-import { saveAnalysis } from "@/lib/store"
+import { saveAnalysis, clearChatHistory  } from "@/lib/store"
 import { Card, Spinner } from "../../components/ui"
 import { FlaskConical, Zap, CheckCircle } from "lucide-react"
 import { Suspense } from "react"
@@ -69,6 +69,7 @@ function AnalysisForm() {
         if (result.success) {
           // Save to localStorage (for instant tab switching)
           saveAnalysis(result.data, result.message)
+          clearChatHistory(result.data.disease_name) // clear this disease's chat for fresh start
 
           // Save to PostgreSQL (for history)
           try {

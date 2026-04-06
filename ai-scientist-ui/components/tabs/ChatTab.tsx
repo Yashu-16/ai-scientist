@@ -70,10 +70,10 @@ export function ChatTab({ data }: { data: AnalysisResult }) {
 
   // Load persisted chat on mount
   useEffect(() => {
-    const saved = loadChatHistory()
+    const saved = loadChatHistory(data.disease_name)
     setMessages(saved)
     setHydrated(true)
-  }, [])
+  }, [data.disease_name])
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -82,8 +82,8 @@ export function ChatTab({ data }: { data: AnalysisResult }) {
 
   const updateMessages = useCallback((newMessages: ChatMessage[]) => {
     setMessages(newMessages)
-    saveChatHistory(newMessages)
-  }, [])
+    saveChatHistory(newMessages, data.disease_name)
+  }, [data.disease_name])
 
   async function send(q: string) {
     if (!q.trim() || loading) return
@@ -111,7 +111,7 @@ export function ChatTab({ data }: { data: AnalysisResult }) {
   }
 
   function handleClear() {
-    clearChatHistory()
+    clearChatHistory(data.disease_name)
     setMessages([])
   }
 
