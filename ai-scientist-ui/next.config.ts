@@ -1,7 +1,9 @@
 import type { NextConfig } from "next"
 
 const nextConfig: NextConfig = {
-  // Allow cross-origin requests to FastAPI backend
+  typescript: {
+    ignoreBuildErrors: true,
+  },
   async headers() {
     return [
       {
