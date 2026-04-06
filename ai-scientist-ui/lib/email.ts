@@ -72,3 +72,39 @@ export async function sendPasswordResetEmail(
     console.error("Failed to send reset email:", error)
   }
 }
+export async function sendOrgInviteEmail(
+  email: string,
+  orgName: string,
+  inviterName: string,
+  role: string,
+  token: string
+) {
+  const url = `${APP}/org/invite/accept?token=${token}`
+
+  try {
+    await resend.emails.send({
+      from:    FROM,
+      to:      email,
+      subject: `You've been invited to join ${orgName} on AI Scientist`,
+      html: `
+        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;">
+          <h2 style="color:#1e293b">You're invited!</h2>
+          <p style="color:#475569;line-height:1.6">
+            <strong>${inviterName}</strong> has invited you to join
+            <strong>${orgName}</strong> on AI Scientist as a <strong>${role}</strong>.
+          </p>
+          <a href="${url}" style="display:inline-block;margin:24px 0;padding:12px 28px;
+            background:#2563eb;color:white;text-decoration:none;border-radius:8px;font-weight:600;">
+            Accept Invitation
+          </a>
+          <p style="color:#94a3b8;font-size:13px;">
+            This invitation expires in 7 days. If you don't have an account,
+            you'll be asked to create one first.
+          </p>
+        </div>
+      `
+    })
+  } catch (error) {
+    console.error("Failed to send invite email:", error)
+  }
+}

@@ -1,6 +1,7 @@
 "use client"
 // components/Sidebar.tsx
 import Link from "next/link"
+import { Building2 } from "lucide-react"
 import { usePathname } from "next/navigation"
 import {
   LayoutDashboard, FlaskConical, Lightbulb,
@@ -13,6 +14,7 @@ const nav = [
   { href:"/hypotheses", label:"All 10 Tabs",   icon:Lightbulb },
   { href:"/insights",   label:"Insights",      icon:TrendingUp },
   { href:"/report",     label:"Report & Chat", icon:FileText },
+  { href:"/org/dashboard", label:"Organization", icon:Building2 },
 ]
 
 export function Sidebar() {

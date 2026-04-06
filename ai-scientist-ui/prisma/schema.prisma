@@ -1,4 +1,3 @@
-// prisma/schema.prisma
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,7 +6,6 @@ datasource db {
   provider = "postgresql"
 }
 
-// ── Auth (NextAuth required tables) ───────────────────────────
 model Account {
   id                String  @id @default(cuid())
   userId            String
@@ -42,29 +40,31 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-// ── Users ─────────────────────────────────────────────────────
 model User {
-  id                String    @id @default(cuid())
-  name              String?
-  email             String?   @unique
-  emailVerified     DateTime?
-  image             String?
-  password          String?   // null for OAuth users
-  role              Role      @default(USER)
-  plan              Plan      @default(FREE)
-  analysesUsed      Int       @default(0)
-  analysesLimit     Int       @default(3)  // Free = 3, Academic = 50, Pro = unlimited
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id             String    @id @default(cuid())
+  name           String?
+  email          String?   @unique
+  emailVerified  DateTime?
+  image          String?
+  password       String?
+  role           Role      @default(USER)
+  plan           Plan      @default(FREE)
+  analysesUsed   Int       @default(0)
+  analysesLimit  Int       @default(3)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
-  // Relations
-  accounts          Account[]
-  sessions          Session[]
-  analyses          Analysis[]
-  passwordResets    PasswordReset[]
-  organizationId    String?
-  organization      Organization? @relation(fields: [organizationId], references: [id])
-  orgRole           OrgRole?
+  accounts       Account[]
+  sessions       Session[]
+  analyses       Analysis[]
+  passwordResets PasswordReset[]
+
+  // Org relation
+  organizationId String?
+  organization   Organization? @relation("OrgMembers", fields: [organizationId], references: [id])
+  orgRole        OrgRole?
+
+  @@index([organizationId])
 }
 
 enum Role {
@@ -86,7 +86,6 @@ enum OrgRole {
   VIEWER
 }
 
-// ── Password Reset ─────────────────────────────────────────────
 model PasswordReset {
   id        String   @id @default(cuid())
   userId    String
@@ -97,31 +96,54 @@ model PasswordReset {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-// ── Organizations (Phase 2) ────────────────────────────────────
 model Organization {
-  id        String   @id @default(cuid())
-  name      String
-  slug      String   @unique
-  logo      String?
-  plan      Plan     @default(FREE)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  members   User[]
+  id             String    @id @default(cuid())
+  name           String
+  slug           String    @unique
+  logo           String?
+  plan           Plan      @default(FREE)
+  analysesUsed   Int       @default(0)
+  analysesLimit  Int       @default(10)
+  billingEmail   String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  members        User[]    @relation("OrgMembers")
+  analyses       Analysis[]
+  invites        OrgInvite[]
 }
 
-// ── Analyses ───────────────────────────────────────────────────
+model OrgInvite {
+  id             String       @id @default(cuid())
+  email          String
+  role           OrgRole      @default(MEMBER)
+  token          String       @unique
+  expires        DateTime
+  accepted       Boolean      @default(false)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId])
+  @@index([token])
+}
+
 model Analysis {
-  id           String   @id @default(cuid())
-  userId       String
-  diseaseName  String
-  status       String   @default("complete")
-  result       Json     // Full pipeline result
-  decision     String?  // GO / NO-GO / INVESTIGATE
-  confidence   Float?
-  riskLevel    String?
-  createdAt    DateTime @default(now())
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id             String        @id @default(cuid())
+  userId         String
+  organizationId String?
+  diseaseName    String
+  status         String        @default("complete")
+  result         Json
+  decision       String?
+  confidence     Float?
+  riskLevel      String?
+  createdAt      DateTime      @default(now())
+
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization? @relation(fields: [organizationId], references: [id])
 
   @@index([userId])
+  @@index([organizationId])
   @@index([createdAt])
 }
