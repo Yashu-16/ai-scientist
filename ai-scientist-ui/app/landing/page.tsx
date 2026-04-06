@@ -270,22 +270,18 @@ export default function LandingPage() {
 
       {/* FOOTER */}
       <footer className="py-8 px-6 bg-gray-950 border-t border-gray-800">
-        <div className="max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <div className="h-6 w-6 rounded bg-blue-600 flex items-center justify-center">
-              <Dna className="h-3 w-3 text-white" />
-            </div>
-            <p className="text-sm font-semibold text-gray-400">AI Scientist V5</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
-            <span>FastAPI + Next.js + GPT-4o-mini</span>
-            <span className="hidden sm:inline">·</span>
-            <span>For exploratory research only. Not for clinical use.</span>
-            <span className="hidden sm:inline">·</span>
-            <a href="http://localhost:8000/docs" target="_blank" rel="noopener noreferrer"
-               className="hover:text-gray-300 transition-colors">API Docs →</a>
-          </div>
-        </div>
+      <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
+        <span>FastAPI + Next.js + GPT-4o-mini</span>
+        <span>·</span>
+        <a href="/terms"   className="hover:text-gray-300 transition-colors">Terms</a>
+        <span>·</span>
+        <a href="/privacy" className="hover:text-gray-300 transition-colors">Privacy</a>
+        <span>·</span>
+        <span>For exploratory research only. Not for clinical use.</span>
+        <span>·</span>
+        <a href="http://localhost:8000/docs" target="_blank" rel="noopener noreferrer"
+        className="hover:text-gray-300 transition-colors">API Docs →</a>
+      </div>
       </footer>
     </div>
   )
