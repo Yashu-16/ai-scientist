@@ -58,6 +58,8 @@ model User {
   sessions       Session[]
   analyses       Analysis[]
   passwordResets PasswordReset[]
+  subscription    Subscription?
+  payments        Payment[]
 
   // Org relation
   organizationId String?
@@ -146,4 +148,46 @@ model Analysis {
   @@index([userId])
   @@index([organizationId])
   @@index([createdAt])
+}
+model Subscription {
+  id                  String    @id @default(cuid())
+  userId              String    @unique
+  razorpaySubId       String?   @unique
+  razorpayCustomerId  String?
+  plan                Plan
+  status              SubStatus @default(ACTIVE)
+  currentPeriodStart  DateTime  @default(now())
+  currentPeriodEnd    DateTime?
+  cancelAtPeriodEnd   Boolean   @default(false)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Payment {
+  id                String        @id @default(cuid())
+  userId            String
+  razorpayOrderId   String?       @unique
+  razorpayPaymentId String?       @unique
+  amount            Int           // in paise (₹999 = 99900)
+  currency          String        @default("INR")
+  plan              Plan
+  status            PaymentStatus @default(PENDING)
+  invoiceUrl        String?
+  createdAt         DateTime      @default(now())
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum SubStatus {
+  ACTIVE
+  CANCELLED
+  PAST_DUE
+  TRIALING
+}
+
+enum PaymentStatus {
+  PENDING
+  CAPTURED
+  FAILED
+  REFUNDED
 }
