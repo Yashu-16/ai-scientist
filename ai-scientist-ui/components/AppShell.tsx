@@ -9,9 +9,9 @@ import { Navbar }  from "./Navbar"
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const isLanding = pathname === "/landing"
+  const isAuth    = pathname.startsWith("/auth")
 
-  if (isLanding) {
-    // Landing page: no sidebar, no navbar, full width
+  if (isLanding || isAuth) {
     return <>{children}</>
   }
 

@@ -67,6 +67,18 @@ function AnalysisForm() {
       clearInterval(ticker)
       if (result.success) {
         saveAnalysis(result.data, result.message)
+        // Also persist to database
+await fetch("/api/analyses", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    diseaseName: result.data.disease_name,
+    result:      result.data,
+    decision:    result.data.decision_summary?.go_no_go?.decision,
+    confidence:  result.data.decision_summary?.confidence_score,
+    riskLevel:   result.data.decision_summary?.risk_level,
+  }),
+})
         router.push("/hypotheses")
       } else {
         setError("Analysis failed. Please try again.")
