@@ -1,61 +1,44 @@
-// app/api/org/members/[id]/route.ts
 import { NextResponse } from "next/server"
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
 
-export async function PATCH(
-  req: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET() {
   const session = await auth()
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  const { id } = await params
-  const { role } = await req.json()
-
-  const actor = await prisma.user.findUnique({ where: { id: session.user.id } })
-  if (!["OWNER", "ADMIN"].includes(actor?.orgRole ?? "")) {
-    return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 })
-  }
-
-  await prisma.user.update({
-    where: { id },
-    data:  { orgRole: role }
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    include: {
+      organization: {
+        include: {
+          members: {
+            select: {
+              id: true, name: true, email: true,
+              orgRole: true, createdAt: true, analysesUsed: true
+            }
+          },
+          invites: {
+            where: { accepted: false, expires: { gt: new Date() } },
+            select: { id: true, email: true, role: true, createdAt: true }
+          },
+          analyses: {
+            orderBy: { createdAt: "desc" },
+            take: 5,
+            select: {
+              id: true, diseaseName: true, decision: true,
+              confidence: true, createdAt: true,
+              user: { select: { name: true, email: true } }
+            }
+          }
+        }
+      }
+    }
   })
 
-  return NextResponse.json({ success: true })
-}
-
-export async function DELETE(
-  _req: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const session = await auth()
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
-
-  const { id } = await params
-
-  const actor = await prisma.user.findUnique({ where: { id: session.user.id } })
-  if (!["OWNER", "ADMIN"].includes(actor?.orgRole ?? "")) {
-    return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 })
-  }
-
-  const target = await prisma.user.findUnique({ where: { id } })
-  if (target?.orgRole === "OWNER") {
-    return NextResponse.json(
-      { error: "Cannot remove the organization owner" },
-      { status: 400 }
-    )
-  }
-
-  await prisma.user.update({
-    where: { id },
-    data:  { organizationId: null, orgRole: null }
+  return NextResponse.json({
+    org:         user?.organization ?? null,
+    userOrgRole: user?.orgRole      ?? null,
   })
-
-  return NextResponse.json({ success: true })
 }
