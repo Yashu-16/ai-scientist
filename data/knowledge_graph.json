@@ -7,7 +7,7 @@
         "Alzheimer disease"
       ],
       "max_score": 0.8697,
-      "appearances": 11
+      "appearances": 12
     },
     "PSEN1": {
       "type": "protein",
@@ -16,7 +16,7 @@
         "Alzheimer disease"
       ],
       "max_score": 0.8663,
-      "appearances": 11
+      "appearances": 12
     },
     "PSEN2": {
       "type": "protein",
@@ -25,7 +25,7 @@
         "Alzheimer disease"
       ],
       "max_score": 0.8165,
-      "appearances": 11
+      "appearances": 12
     },
     "APOE": {
       "type": "protein",
@@ -34,7 +34,7 @@
         "Alzheimer disease"
       ],
       "max_score": 0.7749,
-      "appearances": 11
+      "appearances": 12
     },
     "GRIN1": {
       "type": "protein",
@@ -43,7 +43,7 @@
         "Alzheimer disease"
       ],
       "max_score": 0.7,
-      "appearances": 11
+      "appearances": 12
     },
     "LECANEMAB": {
       "type": "drug",
@@ -116,7 +116,7 @@
         "Brain tumor"
       ],
       "max_score": 0.9178,
-      "appearances": 2
+      "appearances": 3
     },
     "BRCA1": {
       "type": "protein",
@@ -125,7 +125,7 @@
         "breast cancer"
       ],
       "max_score": 0.9093,
-      "appearances": 1
+      "appearances": 2
     },
     "PIK3CA": {
       "type": "protein",
@@ -134,7 +134,7 @@
         "breast cancer"
       ],
       "max_score": 0.8802,
-      "appearances": 1
+      "appearances": 2
     },
     "PALB2": {
       "type": "protein",
@@ -143,7 +143,7 @@
         "breast cancer"
       ],
       "max_score": 0.8751,
-      "appearances": 1
+      "appearances": 2
     },
     "CHEK2": {
       "type": "protein",
@@ -152,7 +152,7 @@
         "breast cancer"
       ],
       "max_score": 0.8679,
-      "appearances": 1
+      "appearances": 2
     },
     "TLR7": {
       "type": "protein",
@@ -323,6 +323,321 @@
       "phase": 4,
       "mechanism": "4-hydroxyphenylpyruvate dioxygenase inhibitor",
       "risk_level": "Low",
+      "appearances": 1
+    },
+    "ERGOLOID MESYLATES": {
+      "type": "drug",
+      "drug_name": "Ergoloid Mesylates",
+      "drug_type": "Unknown",
+      "phase": 4,
+      "mechanism": "Serotonin 1a (5-HT1a) receptor agonist",
+      "risk_level": "Low",
+      "appearances": 1
+    },
+    "DONEPEZIL HYDROCHLORIDE": {
+      "type": "drug",
+      "drug_name": "Donepezil Hydrochloride",
+      "drug_type": "Small molecule",
+      "phase": 4,
+      "mechanism": "Acetylcholinesterase inhibitor",
+      "risk_level": "High",
+      "appearances": 1
+    },
+    "MEMANTINE": {
+      "type": "drug",
+      "drug_name": "Memantine",
+      "drug_type": "Small molecule",
+      "phase": 4,
+      "mechanism": "Glutamate [NMDA] receptor negative allosteric modulator",
+      "risk_level": "High",
+      "appearances": 1
+    },
+    "ADUCANUMAB": {
+      "type": "drug",
+      "drug_name": "Aducanumab",
+      "drug_type": "Antibody",
+      "phase": 4,
+      "mechanism": "Amyloid-beta A4 protein binding agent",
+      "risk_level": "Medium",
+      "appearances": 1
+    },
+    "GALANTAMINE": {
+      "type": "drug",
+      "drug_name": "Galantamine",
+      "drug_type": "Small molecule",
+      "phase": 4,
+      "mechanism": "Acetylcholinesterase inhibitor",
+      "risk_level": "High",
+      "appearances": 1
+    },
+    "MEMANTINE HYDROCHLORIDE": {
+      "type": "drug",
+      "drug_name": "Memantine Hydrochloride",
+      "drug_type": "Small molecule",
+      "phase": 4,
+      "mechanism": "Glutamate [NMDA] receptor negative allosteric modulator",
+      "risk_level": "High",
+      "appearances": 1
+    },
+    "DONEPEZIL": {
+      "type": "drug",
+      "drug_name": "Donepezil",
+      "drug_type": "Small molecule",
+      "phase": 4,
+      "mechanism": "Acetylcholinesterase inhibitor",
+      "risk_level": "High",
+      "appearances": 1
+    },
+    "GALANTAMINE HYDROBROMIDE": {
+      "type": "drug",
+      "drug_name": "Galantamine Hydrobromide",
+      "drug_type": "Small molecule",
+      "phase": 4,
+      "mechanism": "Acetylcholinesterase inhibitor",
+      "risk_level": "High",
+      "appearances": 1
+    },
+    "TACRINE": {
+      "type": "drug",
+      "drug_name": "Tacrine",
+      "drug_type": "Small molecule",
+      "phase": 4,
+      "mechanism": "Cholinesterases; ACHE & BCHE inhibitor",
+      "risk_level": "Low",
+      "appearances": 1
+    },
+    "HUPERZINE A": {
+      "type": "drug",
+      "drug_name": "Huperzine A",
+      "drug_type": "Small molecule",
+      "phase": 4,
+      "mechanism": "Acetylcholinesterase inhibitor",
+      "risk_level": "Low",
+      "appearances": 1
+    },
+    "LRRK2": {
+      "type": "protein",
+      "protein_name": "leucine rich repeat kinase 2",
+      "diseases": [
+        "Parkinson disease"
+      ],
+      "max_score": 0.8802,
+      "appearances": 1
+    },
+    "SNCA": {
+      "type": "protein",
+      "protein_name": "synuclein alpha",
+      "diseases": [
+        "Parkinson disease"
+      ],
+      "max_score": 0.8748,
+      "appearances": 1
+    },
+    "PINK1": {
+      "type": "protein",
+      "protein_name": "PTEN induced kinase 1",
+      "diseases": [
+        "Parkinson disease"
+      ],
+      "max_score": 0.8606,
+      "appearances": 1
+    },
+    "PRKN": {
+      "type": "protein",
+      "protein_name": "parkin RBR E3 ubiquitin protein ligase",
+      "diseases": [
+        "Parkinson disease"
+      ],
+      "max_score": 0.8574,
+      "appearances": 1
+    },
+    "ATP13A2": {
+      "type": "protein",
+      "protein_name": "ATPase cation transporting 13A2",
+      "diseases": [
+        "Parkinson disease"
+      ],
+      "max_score": 0.8574,
+      "appearances": 1
+    },
+    "DOPAMINE": {
+      "type": "drug",
+      "drug_name": "Dopamine",
+      "drug_type": "Small molecule",
+      "phase": 4,
+      "mechanism": "Beta-1 adrenergic receptor agonist",
+      "risk_level": "High",
+      "appearances": 1
+    },
+    "AMANTADINE": {
+      "type": "drug",
+      "drug_name": "Amantadine",
+      "drug_type": "Small molecule",
+      "phase": 4,
+      "mechanism": "Matrix protein 2 inhibitor",
+      "risk_level": "High",
+      "appearances": 1
+    },
+    "PRAMIPEXOLE": {
+      "type": "drug",
+      "drug_name": "Pramipexole",
+      "drug_type": "Small molecule",
+      "phase": 4,
+      "mechanism": "D2-like dopamine receptor agonist",
+      "risk_level": "High",
+      "appearances": 1
+    },
+    "SAFINAMIDE": {
+      "type": "drug",
+      "drug_name": "Safinamide",
+      "drug_type": "Small molecule",
+      "phase": 4,
+      "mechanism": "Monoamine oxidase B inhibitor",
+      "risk_level": "Low",
+      "appearances": 1
+    },
+    "ISTRADEFYLLINE": {
+      "type": "drug",
+      "drug_name": "Istradefylline",
+      "drug_type": "Small molecule",
+      "phase": 4,
+      "mechanism": "Adenosine A2a receptor antagonist",
+      "risk_level": "Low",
+      "appearances": 1
+    },
+    "LEVODOPA": {
+      "type": "drug",
+      "drug_name": "Levodopa",
+      "drug_type": "Small molecule",
+      "phase": 4,
+      "mechanism": "Dopamine D3 receptor agonist",
+      "risk_level": "High",
+      "appearances": 1
+    },
+    "TOLCAPONE": {
+      "type": "drug",
+      "drug_name": "Tolcapone",
+      "drug_type": "Small molecule",
+      "phase": 4,
+      "mechanism": "Catechol O-methyltransferase inhibitor",
+      "risk_level": "Low",
+      "appearances": 1
+    },
+    "BROMOCRIPTINE": {
+      "type": "drug",
+      "drug_name": "Bromocriptine",
+      "drug_type": "Small molecule",
+      "phase": 4,
+      "mechanism": "D2-like dopamine receptor agonist",
+      "risk_level": "High",
+      "appearances": 1
+    },
+    "RASAGILINE": {
+      "type": "drug",
+      "drug_name": "Rasagiline",
+      "drug_type": "Small molecule",
+      "phase": 4,
+      "mechanism": "Monoamine oxidase B inhibitor",
+      "risk_level": "High",
+      "appearances": 1
+    },
+    "ROTIGOTINE": {
+      "type": "drug",
+      "drug_name": "Rotigotine",
+      "drug_type": "Small molecule",
+      "phase": 4,
+      "mechanism": "D2-like dopamine receptor agonist",
+      "risk_level": "High",
+      "appearances": 1
+    },
+    "ERIBULIN MESYLATE": {
+      "type": "drug",
+      "drug_name": "Eribulin Mesylate",
+      "drug_type": "Small molecule",
+      "phase": 4,
+      "mechanism": "Tubulin inhibitor",
+      "risk_level": "Medium",
+      "appearances": 1
+    },
+    "RIVOCERANIB": {
+      "type": "drug",
+      "drug_name": "Rivoceranib",
+      "drug_type": "Small molecule",
+      "phase": 4,
+      "mechanism": "Vascular endothelial growth factor receptor 2 inhibitor",
+      "risk_level": "Low",
+      "appearances": 1
+    },
+    "TAMOXIFEN": {
+      "type": "drug",
+      "drug_name": "Tamoxifen",
+      "drug_type": "Small molecule",
+      "phase": 4,
+      "mechanism": "Estrogen receptor alpha modulator",
+      "risk_level": "High",
+      "appearances": 1
+    },
+    "TAMOXIFEN CITRATE": {
+      "type": "drug",
+      "drug_name": "Tamoxifen Citrate",
+      "drug_type": "Small molecule",
+      "phase": 4,
+      "mechanism": "Estrogen receptor alpha modulator",
+      "risk_level": "High",
+      "appearances": 1
+    },
+    "GOSERELIN": {
+      "type": "drug",
+      "drug_name": "Goserelin",
+      "drug_type": "Protein",
+      "phase": 4,
+      "mechanism": "Gonadotropin-releasing hormone receptor agonist",
+      "risk_level": "High",
+      "appearances": 1
+    },
+    "RIVOCERANIB MESYLATE": {
+      "type": "drug",
+      "drug_name": "Rivoceranib Mesylate",
+      "drug_type": "Small molecule",
+      "phase": 4,
+      "mechanism": "Vascular endothelial growth factor receptor 2 inhibitor",
+      "risk_level": "Low",
+      "appearances": 1
+    },
+    "TOREMIFENE": {
+      "type": "drug",
+      "drug_name": "Toremifene",
+      "drug_type": "Small molecule",
+      "phase": 4,
+      "mechanism": "Estrogen receptor modulator",
+      "risk_level": "Low",
+      "appearances": 1
+    },
+    "MERIMEPODIB": {
+      "type": "drug",
+      "drug_name": "Merimepodib",
+      "drug_type": "Small molecule",
+      "phase": 4,
+      "mechanism": "Inosine-5'-monophosphate dehydrogenase 1 inhibitor",
+      "risk_level": "Low",
+      "appearances": 1
+    },
+    "DEXRAZOXANE": {
+      "type": "drug",
+      "drug_name": "Dexrazoxane",
+      "drug_type": "Small molecule",
+      "phase": 4,
+      "mechanism": "DNA topoisomerase II inhibitor",
+      "risk_level": "High",
+      "appearances": 1
+    },
+    "DEXRAZOXANE HYDROCHLORIDE": {
+      "type": "drug",
+      "drug_name": "Dexrazoxane Hydrochloride",
+      "drug_type": "Small molecule",
+      "phase": 4,
+      "mechanism": "DNA topoisomerase II inhibitor",
+      "risk_level": "Medium",
       "appearances": 1
     }
   },
@@ -542,15 +857,311 @@
       "disease": "Alkaptonuria",
       "score": 0.6184,
       "added_at": "2026-04-10T16:19:28.988420"
+    },
+    {
+      "from": "ERGOLOID MESYLATES",
+      "to": "HTR1A",
+      "relation": "targets",
+      "disease": "Alzheimer disease",
+      "score": 0.5,
+      "added_at": "2026-04-10T16:38:35.501016"
+    },
+    {
+      "from": "DONEPEZIL HYDROCHLORIDE",
+      "to": "ACHE",
+      "relation": "targets",
+      "disease": "Alzheimer disease",
+      "score": 0.5,
+      "added_at": "2026-04-10T16:38:35.501016"
+    },
+    {
+      "from": "MEMANTINE",
+      "to": "GRIN1",
+      "relation": "targets",
+      "disease": "Alzheimer disease",
+      "score": 0.63,
+      "added_at": "2026-04-10T16:38:35.501016"
+    },
+    {
+      "from": "ADUCANUMAB",
+      "to": "APP",
+      "relation": "targets",
+      "disease": "Alzheimer disease",
+      "score": 0.7479,
+      "added_at": "2026-04-10T16:38:35.501016"
+    },
+    {
+      "from": "GALANTAMINE",
+      "to": "ACHE",
+      "relation": "targets",
+      "disease": "Alzheimer disease",
+      "score": 0.5,
+      "added_at": "2026-04-10T16:38:35.501016"
+    },
+    {
+      "from": "MEMANTINE HYDROCHLORIDE",
+      "to": "GRIN1",
+      "relation": "targets",
+      "disease": "Alzheimer disease",
+      "score": 0.5,
+      "added_at": "2026-04-10T16:38:35.501016"
+    },
+    {
+      "from": "DONEPEZIL",
+      "to": "ACHE",
+      "relation": "targets",
+      "disease": "Alzheimer disease",
+      "score": 0.5,
+      "added_at": "2026-04-10T16:38:35.501016"
+    },
+    {
+      "from": "GALANTAMINE HYDROBROMIDE",
+      "to": "ACHE",
+      "relation": "targets",
+      "disease": "Alzheimer disease",
+      "score": 0.5,
+      "added_at": "2026-04-10T16:38:35.501016"
+    },
+    {
+      "from": "TACRINE",
+      "to": "BCHE",
+      "relation": "targets",
+      "disease": "Alzheimer disease",
+      "score": 0.5,
+      "added_at": "2026-04-10T16:38:35.501016"
+    },
+    {
+      "from": "HUPERZINE A",
+      "to": "ACHE",
+      "relation": "targets",
+      "disease": "Alzheimer disease",
+      "score": 0.5,
+      "added_at": "2026-04-10T16:38:35.501016"
+    },
+    {
+      "from": "ERGOLOID MESYLATES",
+      "to": "APOE",
+      "relation": "hypothesis_link",
+      "disease": "Alzheimer disease",
+      "score": 0.75,
+      "added_at": "2026-04-10T16:38:35.501016"
+    },
+    {
+      "from": "DOPAMINE",
+      "to": "ADRB1",
+      "relation": "targets",
+      "disease": "Parkinson disease",
+      "score": 0.5,
+      "added_at": "2026-04-10T16:41:11.008266"
+    },
+    {
+      "from": "AMANTADINE",
+      "to": "",
+      "relation": "targets",
+      "disease": "Parkinson disease",
+      "score": 0.5,
+      "added_at": "2026-04-10T16:41:11.008266"
+    },
+    {
+      "from": "PRAMIPEXOLE",
+      "to": "DRD2",
+      "relation": "targets",
+      "disease": "Parkinson disease",
+      "score": 0.5,
+      "added_at": "2026-04-10T16:41:11.008266"
+    },
+    {
+      "from": "SAFINAMIDE",
+      "to": "MAOB",
+      "relation": "targets",
+      "disease": "Parkinson disease",
+      "score": 0.5,
+      "added_at": "2026-04-10T16:41:11.008266"
+    },
+    {
+      "from": "ISTRADEFYLLINE",
+      "to": "ADORA2A",
+      "relation": "targets",
+      "disease": "Parkinson disease",
+      "score": 0.5,
+      "added_at": "2026-04-10T16:41:11.008266"
+    },
+    {
+      "from": "LEVODOPA",
+      "to": "DRD3",
+      "relation": "targets",
+      "disease": "Parkinson disease",
+      "score": 0.5,
+      "added_at": "2026-04-10T16:41:11.010271"
+    },
+    {
+      "from": "TOLCAPONE",
+      "to": "COMT",
+      "relation": "targets",
+      "disease": "Parkinson disease",
+      "score": 0.5,
+      "added_at": "2026-04-10T16:41:11.010271"
+    },
+    {
+      "from": "BROMOCRIPTINE",
+      "to": "DRD2",
+      "relation": "targets",
+      "disease": "Parkinson disease",
+      "score": 0.5,
+      "added_at": "2026-04-10T16:41:11.010271"
+    },
+    {
+      "from": "RASAGILINE",
+      "to": "MAOB",
+      "relation": "targets",
+      "disease": "Parkinson disease",
+      "score": 0.5,
+      "added_at": "2026-04-10T16:41:11.010271"
+    },
+    {
+      "from": "ROTIGOTINE",
+      "to": "DRD2",
+      "relation": "targets",
+      "disease": "Parkinson disease",
+      "score": 0.5,
+      "added_at": "2026-04-10T16:41:11.010271"
+    },
+    {
+      "from": "SAFINAMIDE",
+      "to": "LRRK2",
+      "relation": "hypothesis_link",
+      "disease": "Parkinson disease",
+      "score": 0.7921,
+      "added_at": "2026-04-10T16:41:11.010271"
+    },
+    {
+      "from": "ISTRADEFYLLINE",
+      "to": "PINK1",
+      "relation": "hypothesis_link",
+      "disease": "Parkinson disease",
+      "score": 0.7842,
+      "added_at": "2026-04-10T16:41:11.010271"
+    },
+    {
+      "from": "PRAMIPEXOLE",
+      "to": "SNCA",
+      "relation": "hypothesis_link",
+      "disease": "Parkinson disease",
+      "score": 0.6999,
+      "added_at": "2026-04-10T16:41:11.010271"
+    },
+    {
+      "from": "ERIBULIN MESYLATE",
+      "to": "TUBB4B",
+      "relation": "targets",
+      "disease": "breast cancer",
+      "score": 0.5,
+      "added_at": "2026-04-10T16:43:25.674736"
+    },
+    {
+      "from": "RIVOCERANIB",
+      "to": "KDR",
+      "relation": "targets",
+      "disease": "breast cancer",
+      "score": 0.5,
+      "added_at": "2026-04-10T16:43:25.674736"
+    },
+    {
+      "from": "TAMOXIFEN",
+      "to": "ESR1",
+      "relation": "targets",
+      "disease": "breast cancer",
+      "score": 0.5,
+      "added_at": "2026-04-10T16:43:25.674736"
+    },
+    {
+      "from": "TAMOXIFEN CITRATE",
+      "to": "ESR1",
+      "relation": "targets",
+      "disease": "breast cancer",
+      "score": 0.5,
+      "added_at": "2026-04-10T16:43:25.674736"
+    },
+    {
+      "from": "GOSERELIN",
+      "to": "GNRHR",
+      "relation": "targets",
+      "disease": "breast cancer",
+      "score": 0.5,
+      "added_at": "2026-04-10T16:43:25.674736"
+    },
+    {
+      "from": "RIVOCERANIB MESYLATE",
+      "to": "KDR",
+      "relation": "targets",
+      "disease": "breast cancer",
+      "score": 0.5,
+      "added_at": "2026-04-10T16:43:25.674736"
+    },
+    {
+      "from": "TOREMIFENE",
+      "to": "ESR2",
+      "relation": "targets",
+      "disease": "breast cancer",
+      "score": 0.5,
+      "added_at": "2026-04-10T16:43:25.674736"
+    },
+    {
+      "from": "MERIMEPODIB",
+      "to": "IMPDH1",
+      "relation": "targets",
+      "disease": "breast cancer",
+      "score": 0.5,
+      "added_at": "2026-04-10T16:43:25.674736"
+    },
+    {
+      "from": "DEXRAZOXANE",
+      "to": "TOP2A",
+      "relation": "targets",
+      "disease": "breast cancer",
+      "score": 0.5,
+      "added_at": "2026-04-10T16:43:25.674736"
+    },
+    {
+      "from": "DEXRAZOXANE HYDROCHLORIDE",
+      "to": "TOP2A",
+      "relation": "targets",
+      "disease": "breast cancer",
+      "score": 0.5,
+      "added_at": "2026-04-10T16:43:25.674736"
+    },
+    {
+      "from": "RIVOCERANIB",
+      "to": "PIK3CA",
+      "relation": "hypothesis_link",
+      "disease": "breast cancer",
+      "score": 0.7921,
+      "added_at": "2026-04-10T16:43:25.674736"
+    },
+    {
+      "from": "TAMOXIFEN",
+      "to": "BRCA2",
+      "relation": "hypothesis_link",
+      "disease": "breast cancer",
+      "score": 0.7171,
+      "added_at": "2026-04-10T16:43:25.674736"
+    },
+    {
+      "from": "GOSERELIN",
+      "to": "CHEK2",
+      "relation": "hypothesis_link",
+      "disease": "breast cancer",
+      "score": 0.6972,
+      "added_at": "2026-04-10T16:43:25.674736"
     }
   ],
   "disease_analyses": {
     "Alzheimer disease": {
-      "last_analyzed": "2026-04-06T17:39:59.457048",
-      "top_drug": "Lecanemab",
-      "top_protein": "APP",
-      "confidence": 0.7479,
-      "decision": "GO"
+      "last_analyzed": "2026-04-10T16:38:35.501016",
+      "top_drug": "Ergoloid Mesylates",
+      "top_protein": "APOE",
+      "confidence": 0.75,
+      "decision": "INVESTIGATE"
     },
     "amyotrophic lateral sclerosis": {
       "last_analyzed": "2026-04-05T15:56:21.542632",
@@ -560,10 +1171,10 @@
       "decision": "INVESTIGATE"
     },
     "breast cancer": {
-      "last_analyzed": "2026-04-07T17:56:58.101146",
-      "top_drug": "PARP inhibitors",
-      "top_protein": "BRCA2",
-      "confidence": 0.5471,
+      "last_analyzed": "2026-04-10T16:43:25.674736",
+      "top_drug": "Rivoceranib",
+      "top_protein": "PIK3CA",
+      "confidence": 0.7921,
       "decision": "INVESTIGATE"
     },
     "Covid19": {
@@ -593,14 +1204,21 @@
       "top_protein": "HPD",
       "confidence": 0.6184,
       "decision": "INVESTIGATE"
+    },
+    "Parkinson disease": {
+      "last_analyzed": "2026-04-10T16:41:11.010271",
+      "top_drug": "Safinamide",
+      "top_protein": "LRRK2",
+      "confidence": 0.7921,
+      "decision": "INVESTIGATE"
     }
   },
   "stats": {
-    "total_analyses": 20,
-    "total_proteins": 30,
-    "total_drugs": 6,
-    "total_edges": 27,
+    "total_analyses": 23,
+    "total_proteins": 35,
+    "total_drugs": 36,
+    "total_edges": 64,
     "created_at": "2026-04-04T09:37:36.259481",
-    "last_updated": "2026-04-10T16:26:54.565142"
+    "last_updated": "2026-04-10T16:43:25.674736"
   }
 }
