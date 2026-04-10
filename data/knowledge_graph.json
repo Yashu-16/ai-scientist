@@ -251,7 +251,7 @@
         "Alkaptonuria"
       ],
       "max_score": 0.8502,
-      "appearances": 4
+      "appearances": 5
     },
     "HPD": {
       "type": "protein",
@@ -260,7 +260,7 @@
         "Alkaptonuria"
       ],
       "max_score": 0.321,
-      "appearances": 4
+      "appearances": 5
     },
     "ENPP1": {
       "type": "protein",
@@ -269,7 +269,7 @@
         "Alkaptonuria"
       ],
       "max_score": 0.0462,
-      "appearances": 4
+      "appearances": 5
     },
     "SAA1": {
       "type": "protein",
@@ -278,7 +278,7 @@
         "Alkaptonuria"
       ],
       "max_score": 0.0332,
-      "appearances": 4
+      "appearances": 5
     },
     "MGP": {
       "type": "protein",
@@ -287,7 +287,7 @@
         "Alkaptonuria"
       ],
       "max_score": 0.0329,
-      "appearances": 4
+      "appearances": 5
     },
     "PEMBROLIZUMAB": {
       "type": "drug",
@@ -323,7 +323,7 @@
       "phase": 4,
       "mechanism": "4-hydroxyphenylpyruvate dioxygenase inhibitor",
       "risk_level": "Low",
-      "appearances": 1
+      "appearances": 2
     },
     "ERGOLOID MESYLATES": {
       "type": "drug",
@@ -847,7 +847,7 @@
       "to": "HGD",
       "relation": "hypothesis_link",
       "disease": "Alkaptonuria",
-      "score": 0.5701,
+      "score": 0.7801,
       "added_at": "2026-04-10T16:19:28.988420"
     },
     {
@@ -1199,10 +1199,10 @@
       "decision": "NO-GO"
     },
     "Alkaptonuria": {
-      "last_analyzed": "2026-04-10T16:26:54.565142",
+      "last_analyzed": "2026-04-10T17:03:14.982710",
       "top_drug": "Nitisinone",
-      "top_protein": "HPD",
-      "confidence": 0.6184,
+      "top_protein": "HGD",
+      "confidence": 0.7801,
       "decision": "INVESTIGATE"
     },
     "Parkinson disease": {
@@ -1214,11 +1214,11 @@
     }
   },
   "stats": {
-    "total_analyses": 23,
+    "total_analyses": 24,
     "total_proteins": 35,
     "total_drugs": 36,
     "total_edges": 64,
     "created_at": "2026-04-04T09:37:36.259481",
-    "last_updated": "2026-04-10T16:43:25.674736"
+    "last_updated": "2026-04-10T17:03:14.984717"
   }
 }

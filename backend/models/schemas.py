@@ -38,6 +38,11 @@ class Drug(BaseModel):
     risk_description:   str                   = ""
     # V4 Feature 4
     competition_intel:  Optional["CompetitionIntel"] = None
+    # Clinical Trials fields (new)
+    clinical_trials:       list = []
+    trial_count:           int  = 0
+    active_trial_count:    int  = 0
+    completed_trial_count: int  = 0
 
 
 # ── Research Paper ────────────────────────────────────────────
