@@ -1,6 +1,7 @@
 # backend/services/hypothesis_service.py
 # V4 — All stages: Rank, Causal, Validation, Critique,
 #       Uncertainty, GO/NO-GO, Failure Prediction
+# V5 — Fixed mock fallback to use real disease proteins/drugs
 
 import os
 import json
@@ -78,7 +79,8 @@ STRICT REQUIREMENTS — VIOLATING ANY = INVALID OUTPUT:
 
 1. EACH hypothesis MUST name:
    a) A SPECIFIC protein from the evidence (use exact gene symbol e.g. PSEN1)
-   b) A SPECIFIC drug from the evidence (use exact drug name e.g. NIROGACESTAT)
+   b) A SPECIFIC drug from the evidence — use exact name if available, OR use
+      "Potential Inhibitor" / "Investigational Compound" if no drugs in evidence
    c) A SPECIFIC biological pathway (e.g. "amyloidogenic pathway", "NMDA excitotoxicity")
    d) A SPECIFIC mechanism of action (e.g. "gamma-secretase inhibition", "NMDA antagonism")
 
@@ -226,38 +228,132 @@ def rank_hypotheses(hypotheses, pipeline_result):
 
 # ── 4. Mock Hypotheses ────────────────────────────────────────
 
-def get_mock_hypotheses(disease_name: str) -> list:
+def get_mock_hypotheses(
+    disease_name:    str,
+    protein_targets: list = None,
+    drugs:           list = None
+) -> list:
+    """
+    Generate disease-specific fallback hypotheses using
+    actual protein targets and drugs from the pipeline.
+    Only used when GPT fails or no LLM key is configured.
+    Never uses hardcoded Alzheimer data.
+    """
+    # Use actual proteins from analysis
+    p1 = protein_targets[0].gene_symbol    if protein_targets and len(protein_targets) > 0 else "TARGET1"
+    p2 = protein_targets[1].gene_symbol    if protein_targets and len(protein_targets) > 1 else "TARGET2"
+    p3 = protein_targets[2].gene_symbol    if protein_targets and len(protein_targets) > 2 else "TARGET3"
+    s1 = protein_targets[0].association_score if protein_targets and len(protein_targets) > 0 else 0.5
+    s2 = protein_targets[1].association_score if protein_targets and len(protein_targets) > 1 else 0.3
+
+    # Use actual drugs from analysis
+    d1   = drugs[0].drug_name       if drugs and len(drugs) > 0 else "Investigational Compound"
+    d2   = drugs[1].drug_name       if drugs and len(drugs) > 1 else "Potential Inhibitor"
+    d3   = drugs[2].drug_name       if drugs and len(drugs) > 2 else "Combination Therapy"
+    ph1  = drugs[0].clinical_phase  if drugs and len(drugs) > 0 else 0
+    moa1 = drugs[0].mechanism       if drugs and len(drugs) > 0 else "mechanism under investigation"
+
+    conf1 = min(0.85, round(s1 * 0.9, 2))
+    conf2 = min(0.65, round(s2 * 0.8, 2))
+
+    print(f"   ℹ️  Mock hypotheses using: proteins=[{p1},{p2},{p3}] drugs=[{d1},{d2}]")
+
     return [
         Hypothesis(
-            title             = f"PSEN1 gamma-secretase inhibition via Nirogacestat in {disease_name}",
-            explanation       = "PSEN1 encodes presenilin-1, the catalytic subunit of gamma-secretase which cleaves APP into amyloid-beta. Nirogacestat blocks this cleavage, reducing neurotoxic amyloid-beta42 production targeting the amyloid cascade directly.",
-            simple_explanation= "Think of PSEN1 as scissors cutting a protein into toxic pieces. Nirogacestat acts like a blade guard.",
-            confidence_score  = 0.82,
-            confidence_label  = "High",
-            key_proteins      = ["PSEN1"],
-            key_drugs         = ["NIROGACESTAT"],
-            evidence_summary  = "PSEN1 highest association score (0.867), Nirogacestat Phase 4"
+            title              = f"{p1} inhibition via {d1} in {disease_name}",
+            explanation        = (
+                f"{p1} shows the highest association score ({s1:.2f}) with {disease_name} "
+                f"based on OpenTargets genetic and molecular evidence. "
+                f"{d1} targets this protein through {moa1}. "
+                f"Inhibiting {p1} may reduce disease progression by modulating "
+                f"the primary pathological pathway in {disease_name}. "
+                f"This approach is supported by the available protein-disease association data."
+            ),
+            simple_explanation = (
+                f"Think of {p1} as a key driver of {disease_name}. "
+                f"{d1} acts as a blocker to slow the disease process."
+            ),
+            confidence_score   = conf1,
+            confidence_label   = "High" if conf1 >= 0.8 else "Medium-High" if conf1 >= 0.6 else "Medium",
+            key_proteins       = [p1],
+            key_drugs          = [d1],
+            evidence_summary   = (
+                f"{p1} has association score {s1:.2f} in OpenTargets; "
+                f"{d1} is Phase {ph1 or 'unknown'} clinical candidate"
+            ),
+            reasoning_steps    = [
+                f"Step 1 — Protein role: {p1} is the top-ranked protein for {disease_name} "
+                f"with association score {s1:.2f}",
+                f"Step 2 — Drug mechanism: {d1} acts via {moa1}",
+                f"Step 3 — Pathway interaction: {d1} modulates {p1} activity "
+                f"reducing downstream disease signaling",
+                f"Step 4 — Therapeutic logic: Highest association score suggests "
+                f"strongest causal link to {disease_name}"
+            ]
         ),
         Hypothesis(
-            title             = "Lecanemab APP clearance via amyloidogenic pathway in {disease_name}",
-            explanation       = "APP-derived amyloid-beta oligomers drive neurodegeneration. Lecanemab targets these for clearance in the amyloidogenic pathway.",
-            simple_explanation= "Alzheimer's is like a clogged drain. Lecanemab is drain cleaner.",
-            confidence_score  = 0.71,
-            confidence_label  = "Medium-High",
-            key_proteins      = ["APP"],
-            key_drugs         = ["LECANEMAB"],
-            evidence_summary  = "APP score 0.854; Lecanemab FDA-approved Phase 4"
+            title              = f"{p2} modulation via {d2} in {disease_name}",
+            explanation        = (
+                f"{p2} represents a secondary protein target with documented association "
+                f"to {disease_name} (score: {s2:.2f}). "
+                f"{d2} targeting {p2} could provide therapeutic benefit through "
+                f"an alternative pathway. "
+                f"This approach may be particularly relevant for patients who do not "
+                f"respond to {p1}-targeted therapy in {disease_name}."
+            ),
+            simple_explanation = (
+                f"{p2} is a secondary target in {disease_name}. "
+                f"{d2} offers an alternative treatment route."
+            ),
+            confidence_score   = conf2,
+            confidence_label   = "Medium-High" if conf2 >= 0.6 else "Medium",
+            key_proteins       = [p2],
+            key_drugs          = [d2],
+            evidence_summary   = (
+                f"{p2} has association score {s2:.2f}; "
+                f"{d2} is an investigational candidate for this pathway"
+            ),
+            reasoning_steps    = [
+                f"Step 1 — Protein role: {p2} has documented involvement "
+                f"in {disease_name} pathology (score: {s2:.2f})",
+                f"Step 2 — Drug mechanism: {d2} modulates {p2} activity",
+                f"Step 3 — Pathway interaction: {p2} and {p1} may act "
+                f"in complementary pathways",
+                f"Step 4 — Therapeutic logic: Alternative target provides "
+                f"treatment option for non-responders to {p1}-targeted therapy"
+            ]
         ),
         Hypothesis(
-            title             = "GRIN1 NMDA modulation protects against excitotoxicity in {disease_name}",
-            explanation       = "GRIN1 mediates glutamate excitotoxicity via NMDA receptor pathway. NMDA antagonists reduce excitotoxic calcium influx.",
-            simple_explanation= "Brain cells get overstimulated. GRIN1 is the volume knob.",
-            confidence_score  = 0.65,
-            confidence_label  = "Medium-High",
-            key_proteins      = ["GRIN1"],
-            key_drugs         = ["Memantine"],
-            evidence_summary  = "GRIN1 score 0.684, Memantine established NMDA antagonist"
-        )
+            title              = f"Combination targeting {p1} and {p3} via {d3} in {disease_name}",
+            explanation        = (
+                f"Simultaneously targeting {p1} and {p3} may provide synergistic "
+                f"therapeutic effects in {disease_name}. "
+                f"Both proteins show association with the disease, suggesting they "
+                f"may act in related or complementary pathways. "
+                f"{d3} approaches addressing both targets could overcome "
+                f"the limitations of single-target therapy in {disease_name}."
+            ),
+            simple_explanation = (
+                f"Attacking {disease_name} from two angles at once — "
+                f"targeting both {p1} and {p3} simultaneously."
+            ),
+            confidence_score   = round(conf2 * 0.8, 2),
+            confidence_label   = "Medium",
+            key_proteins       = [p1, p3],
+            key_drugs          = [d3],
+            evidence_summary   = (
+                f"Multi-target strategy using {p1} and {p3} co-association "
+                f"in {disease_name}"
+            ),
+            reasoning_steps    = [
+                f"Step 1 — Protein role: Both {p1} and {p3} are associated "
+                f"with {disease_name}",
+                f"Step 2 — Drug mechanism: {d3} addresses multiple targets",
+                f"Step 3 — Pathway interaction: Dual inhibition prevents "
+                f"pathway compensation",
+                f"Step 4 — Therapeutic logic: Reduces risk of single-target resistance"
+            ]
+        ),
     ]
 
 
@@ -272,8 +368,8 @@ def calculate_confidence_label(score: float) -> str:
 
 
 def validate_hypothesis_quality(hyp_data: dict) -> tuple:
-    proteins  = hyp_data.get("key_proteins", [])
-    drugs     = hyp_data.get("key_drugs", [])
+    proteins    = hyp_data.get("key_proteins", [])
+    drugs       = hyp_data.get("key_drugs", [])
     explanation = hyp_data.get("explanation", "")
     reasoning   = hyp_data.get("reasoning_steps", [])
 
@@ -301,7 +397,16 @@ def validate_hypothesis_quality(hyp_data: dict) -> tuple:
     return True, "OK"
 
 
-def parse_hypothesis_response(raw_json: str, disease_name: str) -> list:
+def parse_hypothesis_response(
+    raw_json:        str,
+    disease_name:    str,
+    protein_targets: list = None,
+    drugs:           list = None
+) -> list:
+    """
+    Parse LLM JSON response into Hypothesis objects.
+    Falls back to disease-specific mock hypotheses on failure.
+    """
     cleaned = raw_json.strip()
     if cleaned.startswith("```"):
         lines   = cleaned.split("\n")
@@ -340,16 +445,19 @@ def parse_hypothesis_response(raw_json: str, disease_name: str) -> list:
 
         if rejected > 0:
             print(f"   ⚠️  {rejected} hypothesis(es) rejected for quality")
+
         if not hypotheses:
-            print("   ⚠️  All hypotheses failed validation — using mocks")
-            return get_mock_hypotheses(disease_name)
+            print("   ⚠️  All hypotheses failed validation — using disease-specific mocks")
+            # ← FIXED: pass real proteins and drugs
+            return get_mock_hypotheses(disease_name, protein_targets, drugs)
 
         print(f"   ✅ Parsed {len(hypotheses)} valid hypotheses")
         return hypotheses
 
     except json.JSONDecodeError as e:
         print(f"   ❌ JSON parse error: {e}")
-        return get_mock_hypotheses(disease_name)
+        # ← FIXED: pass real proteins and drugs
+        return get_mock_hypotheses(disease_name, protein_targets, drugs)
 
 
 # ── 6. Stage Functions ────────────────────────────────────────
@@ -460,10 +568,10 @@ Return ONLY valid JSON. No markdown.
         for item in suggestions:
             idx = item.get("hypothesis_index", 0)
             if idx < len(hypotheses):
-                v_type = item.get("validation_type", "In-vitro")
-                v_color= {"In-vitro":"#3b82f6","In-vivo":"#8b5cf6","Clinical":"#f59e0b"}.get(v_type,"#64748b")
-                diff   = item.get("difficulty","Medium")
-                d_color= {"Low":"#22c55e","Medium":"#f59e0b","High":"#ef4444"}.get(diff,"#64748b")
+                v_type  = item.get("validation_type", "In-vitro")
+                v_color = {"In-vitro":"#3b82f6","In-vivo":"#8b5cf6","Clinical":"#f59e0b"}.get(v_type,"#64748b")
+                diff    = item.get("difficulty","Medium")
+                d_color = {"Low":"#22c55e","Medium":"#f59e0b","High":"#ef4444"}.get(diff,"#64748b")
                 hypotheses[idx].validation_suggestion = ValidationSuggestion(
                     validation_type        = v_type,
                     validation_color       = v_color,
@@ -489,8 +597,8 @@ Return ONLY valid JSON. No markdown.
 
 def _mock_validation(hyp):
     from backend.models.schemas import ValidationSuggestion
-    drug    = hyp.key_drugs[0] if hyp.key_drugs else "the compound"
-    protein = hyp.key_proteins[0] if hyp.key_proteins else "the target"
+    drug       = hyp.key_drugs[0]    if hyp.key_drugs    else "the compound"
+    protein    = hyp.key_proteins[0] if hyp.key_proteins else "the target"
     drug_upper = drug.upper()
     if any(x in drug_upper for x in ["MAB","UMAB","ZUMAB","NUMAB"]):
         v_type, v_color = "Clinical", "#f59e0b"
@@ -508,8 +616,8 @@ def _mock_validation(hyp):
             f"concentrations of {drug}. Measure protein activity and "
             f"downstream pathway markers using standard biochemical assays."
         ),
-        required_tools   = ["Cell culture facility","Western blot","ELISA kit","Flow cytometer"],
-        expected_outcome = f"Dose-dependent reduction in {protein} activity.",
+        required_tools     = ["Cell culture facility","Western blot","ELISA kit","Flow cytometer"],
+        expected_outcome   = f"Dose-dependent reduction in {protein} activity.",
         estimated_timeline = "3-6 months",
         difficulty         = "Medium",
         difficulty_color   = "#f59e0b"
@@ -605,7 +713,7 @@ SEVERITY: Minor / Moderate / Major. Return ONLY valid JSON.
 def _mock_critique(hyp):
     from backend.models.schemas import HypothesisCritique
     protein = hyp.key_proteins[0] if hyp.key_proteins else "the target"
-    drug    = hyp.key_drugs[0] if hyp.key_drugs else "the compound"
+    drug    = hyp.key_drugs[0]    if hyp.key_drugs    else "the compound"
     return HypothesisCritique(
         overall_assessment     = "Hypothesis is plausible but requires additional validation.",
         weaknesses             = [
@@ -614,8 +722,8 @@ def _mock_critique(hyp):
             "Insufficient paper evidence to rule out off-target effects."
         ],
         contradictory_evidence = [
-            "Some trials targeting similar pathways show limited cognitive benefit.",
-            "Blood-brain barrier penetration not confirmed in all populations."
+            "Some trials targeting similar pathways show limited benefit.",
+            "Systemic exposure and target engagement not confirmed."
         ],
         risks                  = [
             f"FDA adverse event signals require monitoring for {drug}.",
@@ -705,15 +813,8 @@ Return ONLY a JSON array with exactly {len(hypotheses)} objects:
 ]
 
 IMPORTANT: success_probability MUST be a decimal 0.0-1.0 (e.g. 0.65 NOT 65).
-
-FAILURE RISK SCORE: 0.0-0.3=Low, 0.3-0.5=Medium, 0.5-0.7=High, 0.7-1.0=Very High
-
-SUCCESS PROBABILITY (decimal 0.0-1.0):
-- Phase 4: 0.60-0.80
-- Phase 3: 0.40-0.60
-- Phase 2: 0.20-0.40
-- Phase 1: 0.10-0.20
-
+FAILURE RISK: 0.0-0.3=Low, 0.3-0.5=Medium, 0.5-0.7=High, 0.7-1.0=Very High
+SUCCESS PROBABILITY: Phase 4=0.60-0.80, Phase 3=0.40-0.60, Phase 2=0.20-0.40
 CATEGORIES: Safety, Efficacy, Mechanism, Trial Design, Market
 Return ONLY valid JSON. No markdown.
 """
@@ -743,12 +844,11 @@ Return ONLY valid JSON. No markdown.
 
             risk_score = max(0.0, min(1.0, float(item.get("failure_risk_score",0.5))))
 
-            if risk_score >= 0.7:        risk_label = "Very High"
-            elif risk_score >= 0.5:      risk_label = "High"
-            elif risk_score >= 0.3:      risk_label = "Medium"
-            else:                        risk_label = "Low"
+            if risk_score >= 0.7:   risk_label = "Very High"
+            elif risk_score >= 0.5: risk_label = "High"
+            elif risk_score >= 0.3: risk_label = "Medium"
+            else:                   risk_label = "Low"
 
-            # ── Fix: normalize success_probability ────────────
             raw_sp       = float(item.get("success_probability", 0.5))
             success_prob = raw_sp / 100.0 if raw_sp > 1.0 else raw_sp
             success_prob = round(max(0.0, min(1.0, success_prob)), 3)
@@ -808,7 +908,7 @@ def _get_drug_risk(drug_names, pipeline_result):
 
 def _mock_failure_prediction(hyp):
     from backend.models.schemas import FailurePrediction, FailureReason
-    drug    = hyp.key_drugs[0] if hyp.key_drugs else "the compound"
+    drug    = hyp.key_drugs[0]    if hyp.key_drugs    else "the compound"
     protein = hyp.key_proteins[0] if hyp.key_proteins else "the target"
     return FailurePrediction(
         failure_risk_score   = 0.45,
@@ -819,23 +919,23 @@ def _mock_failure_prediction(hyp):
         success_probability  = 0.45,
         failure_reasons      = [
             FailureReason(
-                category="Efficacy",reason="Biomarker improvement may not translate to clinical benefit",
-                severity="High",evidence="Historical precedent in similar drug class",
-                mitigation="Include cognitive endpoints alongside biomarker measures"
+                category="Efficacy", reason="Biomarker improvement may not translate to clinical benefit",
+                severity="High", evidence="Historical precedent in similar drug class",
+                mitigation="Include clinical endpoints alongside biomarker measures"
             ),
             FailureReason(
-                category="Mechanism",reason=f"Pathway redundancy around {protein} target",
-                severity="Medium",evidence="Known compensatory pathways in literature",
+                category="Mechanism", reason=f"Pathway redundancy around {protein} target",
+                severity="Medium", evidence="Known compensatory pathways in literature",
                 mitigation="Consider combination therapy approach"
             ),
             FailureReason(
-                category="Safety",reason="Long-term safety profile not fully established",
-                severity="Medium",evidence="Limited long-term follow-up data",
+                category="Safety", reason="Long-term safety profile not fully established",
+                severity="Medium", evidence="Limited long-term follow-up data",
                 mitigation="Design extended safety monitoring protocol"
             )
         ],
         recommended_safeguards=[
-            "Include biomarker + clinical cognitive endpoints",
+            "Include biomarker + clinical endpoints",
             "Design adaptive trial with interim analysis",
             "Monitor for pathway compensation in pre-clinical models",
             "Establish clear stopping rules for safety signals"
@@ -864,14 +964,11 @@ def generate_evidence_explanation(hypothesis, detail_level="scientist"):
     except Exception as e:
         return f"Explanation unavailable: {str(e)}"
 
+
 def compute_time_to_impact(
     hypothesis:      "Hypothesis",
     pipeline_result: DiseaseAnalysisResult
 ) -> "TimeToImpact":
-    """
-    Feature 5: Estimate time from current stage to clinical impact.
-    Uses clinical phase + risk level + historical benchmarks.
-    """
     from backend.models.schemas import TimeToImpact
 
     drug_name  = hypothesis.key_drugs[0] if hypothesis.key_drugs else ""
@@ -884,95 +981,51 @@ def compute_time_to_impact(
             risk_level = drug.risk_level
             break
 
-    # ── Phase-based timeline estimates ───────────────────────
-    # Source: Industry benchmarks (FDA, BIO, Informa)
     PHASE_DATA = {
-        4: {
-            "stage":       "Phase 4 / FDA Approved",
-            "next":        "Post-market surveillance + label expansion",
-            "years_base":  1.0,
-            "years_range": "0–2 years",
-            "success":     0.85,
-            "speed":       "Fast",
-            "timeline": [
-                "Currently approved / Phase 4 post-market",
-                "Label expansion studies: 1–2 years",
-                "New indication approval: 2–4 years if applicable"
-            ]
-        },
-        3: {
-            "stage":       "Phase 3 Clinical Trial",
-            "next":        "Complete Phase 3, file NDA/BLA with FDA",
-            "years_base":  3.0,
-            "years_range": "2–5 years",
-            "success":     0.58,
-            "speed":       "Medium",
-            "timeline": [
-                "Complete ongoing Phase 3 trial: 1–3 years",
-                "FDA NDA/BLA submission and review: 1–2 years",
-                "Potential approval and launch: +6–12 months"
-            ]
-        },
-        2: {
-            "stage":       "Phase 2 Clinical Trial",
-            "next":        "Complete Phase 2, design Phase 3, seek funding",
-            "years_base":  6.0,
-            "years_range": "5–9 years",
-            "success":     0.32,
-            "speed":       "Medium",
-            "timeline": [
-                "Complete Phase 2 trials: 2–3 years",
-                "Design and fund Phase 3: 1–2 years",
-                "Phase 3 trials: 2–4 years",
-                "FDA review and approval: 1–2 years"
-            ]
-        },
-        1: {
-            "stage":       "Phase 1 Clinical Trial",
-            "next":        "Complete Phase 1 safety, advance to Phase 2",
-            "years_base":  9.0,
-            "years_range": "8–12 years",
-            "success":     0.15,
-            "speed":       "Slow",
-            "timeline": [
-                "Complete Phase 1 safety studies: 1–2 years",
-                "Phase 2 efficacy trials: 2–4 years",
-                "Phase 3 confirmatory trials: 3–5 years",
-                "FDA review and approval: 1–2 years"
-            ]
-        },
-        0: {
-            "stage":       "Preclinical / Research Stage",
-            "next":        "Complete preclinical validation, file IND",
-            "years_base":  12.0,
-            "years_range": "10–15 years",
-            "success":     0.10,
-            "speed":       "Slow",
-            "timeline": [
-                "Preclinical validation: 2–4 years",
-                "IND filing and Phase 1: 2–3 years",
-                "Phase 2 + Phase 3: 5–8 years",
-                "FDA review: 1–2 years"
-            ]
-        }
+        4: {"stage":"Phase 4 / FDA Approved","next":"Post-market surveillance + label expansion",
+            "years_base":1.0,"years_range":"0–2 years","success":0.85,"speed":"Fast",
+            "timeline":["Currently approved / Phase 4 post-market",
+                        "Label expansion studies: 1–2 years",
+                        "New indication approval: 2–4 years if applicable"]},
+        3: {"stage":"Phase 3 Clinical Trial","next":"Complete Phase 3, file NDA/BLA with FDA",
+            "years_base":3.0,"years_range":"2–5 years","success":0.58,"speed":"Medium",
+            "timeline":["Complete ongoing Phase 3 trial: 1–3 years",
+                        "FDA NDA/BLA submission and review: 1–2 years",
+                        "Potential approval and launch: +6–12 months"]},
+        2: {"stage":"Phase 2 Clinical Trial","next":"Complete Phase 2, design Phase 3, seek funding",
+            "years_base":6.0,"years_range":"5–9 years","success":0.32,"speed":"Medium",
+            "timeline":["Complete Phase 2 trials: 2–3 years",
+                        "Design and fund Phase 3: 1–2 years",
+                        "Phase 3 trials: 2–4 years",
+                        "FDA review and approval: 1–2 years"]},
+        1: {"stage":"Phase 1 Clinical Trial","next":"Complete Phase 1 safety, advance to Phase 2",
+            "years_base":9.0,"years_range":"8–12 years","success":0.15,"speed":"Slow",
+            "timeline":["Complete Phase 1 safety studies: 1–2 years",
+                        "Phase 2 efficacy trials: 2–4 years",
+                        "Phase 3 confirmatory trials: 3–5 years",
+                        "FDA review and approval: 1–2 years"]},
+        0: {"stage":"Preclinical / Research Stage","next":"Complete preclinical validation, file IND",
+            "years_base":12.0,"years_range":"10–15 years","success":0.10,"speed":"Slow",
+            "timeline":["Preclinical validation: 2–4 years",
+                        "IND filing and Phase 1: 2–3 years",
+                        "Phase 2 + Phase 3: 5–8 years",
+                        "FDA review: 1–2 years"]},
     }
 
     data       = PHASE_DATA.get(phase, PHASE_DATA[0])
     years_base = data["years_base"]
     success    = data["success"]
 
-    # ── Adjust for risk ───────────────────────────────────────
     risk_adjustments = {
-        "High":    (2.0, -0.20),   # +2 years, -20% success
-        "Medium":  (0.5, -0.05),   # +0.5 years, -5% success
-        "Low":     (0.0,  0.05),   # No delay, +5% success
-        "Unknown": (1.0, -0.10)    # +1 year, -10% success
+        "High":    (2.0, -0.20),
+        "Medium":  (0.5, -0.05),
+        "Low":     (0.0,  0.05),
+        "Unknown": (1.0, -0.10)
     }
     year_adj, success_adj = risk_adjustments.get(risk_level, (1.0, -0.10))
-    years_final  = round(years_base + year_adj, 1)
-    success_final= round(max(0.05, min(0.95, success + success_adj)), 3)
+    years_final   = round(years_base + year_adj, 1)
+    success_final = round(max(0.05, min(0.95, success + success_adj)), 3)
 
-    # ── Bottlenecks ───────────────────────────────────────────
     bottlenecks = []
     if risk_level == "High":
         bottlenecks.append("High FDA adverse event burden requires additional safety studies")
@@ -1003,15 +1056,11 @@ def generate_executive_summaries(
     hypotheses:      list,
     pipeline_result: DiseaseAnalysisResult
 ) -> list:
-    """
-    Feature 6: Generate non-technical executive summaries.
-    Single batched LLM call for all hypotheses.
-    """
     from backend.models.schemas import ExecutiveSummary
 
     if LLM_PROVIDER == "mock" or client is None:
         for hyp in hypotheses:
-            hyp.executive_summary = _mock_executive_summary(hyp)
+            hyp.executive_summary = _mock_executive_summary(hyp, pipeline_result.disease_name)
         return hypotheses
 
     print("\n📋 Generating executive summaries...")
@@ -1029,7 +1078,6 @@ def generate_executive_summaries(
 
     prompt = f"""
 You are a biotech communications expert writing for C-suite executives and investors.
-
 Summarize each hypothesis for {pipeline_result.disease_name} in plain business language.
 No jargon. Focus on: what it is, why it matters, what to do, what the risk is.
 
@@ -1041,18 +1089,11 @@ Return ONLY a JSON array with exactly {len(hypotheses)} objects:
   {{
     "hypothesis_index": 0,
     "headline": "One punchy sentence (max 15 words) — the elevator pitch",
-    "body": "3-4 sentences for a non-scientist executive. What is the target? Why does it matter for patients? What stage is the drug? What makes this promising?",
-    "market_opportunity": "One sentence about business/market value of this approach",
+    "body": "3-4 sentences for a non-scientist executive.",
+    "market_opportunity": "One sentence about business/market value",
     "bottom_line": "One sentence: what decision should be made?"
   }}
 ]
-
-RULES:
-- Avoid: pathway names, gene symbols, molecular biology jargon
-- Use: patient outcomes, market size, competitive advantage, revenue potential
-- Be specific about drug name and disease
-- Keep each field concise and business-focused
-
 Return ONLY valid JSON. No markdown.
 """
 
@@ -1088,38 +1129,35 @@ Return ONLY valid JSON. No markdown.
         print(f"   ⚠️  Executive summary error: {e}")
         for hyp in hypotheses:
             if not hyp.executive_summary:
-                hyp.executive_summary = _mock_executive_summary(hyp)
+                hyp.executive_summary = _mock_executive_summary(hyp, pipeline_result.disease_name)
 
     return hypotheses
 
 
-def _mock_executive_summary(hyp) -> "ExecutiveSummary":
+def _mock_executive_summary(hyp, disease_name: str = "this disease") -> "ExecutiveSummary":
     from backend.models.schemas import ExecutiveSummary
-    drug = hyp.key_drugs[0] if hyp.key_drugs else "this compound"
+    drug    = hyp.key_drugs[0]    if hyp.key_drugs    else "this compound"
+    protein = hyp.key_proteins[0] if hyp.key_proteins else "this target"
     return ExecutiveSummary(
-        headline           = f"{drug} shows strong potential for Alzheimer's treatment",
+        headline           = f"{drug} shows potential for treating {disease_name}",
         body               = (
-            f"{drug} is a clinically validated treatment targeting a key driver "
-            f"of the disease. Current evidence supports a {hyp.final_score:.0%} "
-            f"confidence score, making it one of the stronger candidates in our "
-            f"analysis. The drug has demonstrated meaningful activity and has an "
-            f"established safety profile from clinical trials."
+            f"{drug} is a clinical-stage treatment targeting {protein}, "
+            f"a key driver of {disease_name}. "
+            f"Current evidence supports a {hyp.final_score:.0%} confidence score. "
+            f"The drug has an established safety profile from clinical trials."
         ),
         market_opportunity = (
-            f"The Alzheimer's therapeutics market exceeds $10B annually. "
-            f"{drug} addresses an unmet need with a differentiated mechanism."
+            f"{disease_name} represents a significant unmet medical need. "
+            f"{drug} addresses this with a differentiated mechanism."
         ),
-        bottom_line        = f"Recommend proceeding with validation studies for {drug}.",
+        bottom_line        = f"Recommend proceeding with validation studies for {drug} in {disease_name}.",
         audience_level     = "Executive"
     )
+
 
 def generate_literature_review(
     pipeline_result: DiseaseAnalysisResult
 ) -> "LiteratureReview":
-    """
-    Feature 7: Generate a structured literature review for the disease analysis.
-    Single LLM call producing a research-style report.
-    """
     from backend.models.schemas import LiteratureReview
     from datetime import datetime
 
@@ -1157,20 +1195,16 @@ AVAILABLE EVIDENCE:
 - Best hypothesis: {best_hyp.title if best_hyp else 'None'}
 - Evidence strength: {pipeline_result.evidence_strength.evidence_label if pipeline_result.evidence_strength else 'Unknown'}
 
-Write a structured literature review with these EXACT sections.
-Each section should be 2-4 sentences. Be specific and cite the proteins/drugs above.
-
 Return ONLY a JSON object:
 {{
   "background": "2-3 sentences: what is {pipeline_result.disease_name}, prevalence, current treatment landscape",
-  "current_research": "2-3 sentences: what research directions are most active, what has been tried",
-  "research_gaps": "2-3 sentences: what critical questions remain unanswered, what has failed",
-  "proposed_hypothesis": "2-3 sentences: explain the best hypothesis in scientific terms",
-  "supporting_evidence": "2-3 sentences: what specific evidence supports this direction",
-  "risks_limitations": "2-3 sentences: key risks, limitations, and uncertainties",
-  "conclusion": "2-3 sentences: overall assessment and recommended next steps"
+  "current_research": "2-3 sentences: active research directions",
+  "research_gaps": "2-3 sentences: unanswered questions",
+  "proposed_hypothesis": "2-3 sentences: best hypothesis in scientific terms",
+  "supporting_evidence": "2-3 sentences: specific evidence supporting this direction",
+  "risks_limitations": "2-3 sentences: key risks and uncertainties",
+  "conclusion": "2-3 sentences: overall assessment and next steps"
 }}
-
 Return ONLY valid JSON. No markdown.
 """
 
@@ -1210,18 +1244,46 @@ Return ONLY valid JSON. No markdown.
 def _mock_literature_review(pipeline_result) -> "LiteratureReview":
     from backend.models.schemas import LiteratureReview
     from datetime import datetime
-    disease = pipeline_result.disease_name
+    disease  = pipeline_result.disease_name
     proteins = ", ".join([p.gene_symbol for p in pipeline_result.protein_targets[:3]])
-    drugs    = ", ".join([d.drug_name for d in pipeline_result.drugs[:3]])
+    drugs    = ", ".join([d.drug_name   for d in pipeline_result.drugs[:3]])
     return LiteratureReview(
         disease_name        = disease,
-        background          = f"{disease} is a complex disorder affecting millions worldwide. Current treatments address symptoms but do not modify disease progression. Significant unmet medical need exists for disease-modifying therapies.",
-        current_research    = f"Research has focused on key protein targets including {proteins}. Multiple drug candidates including {drugs} have entered clinical evaluation. The field is moving toward combination approaches and precision medicine strategies.",
-        research_gaps       = "Direct causality between protein targets and disease progression remains incompletely established. Long-term efficacy of current drug candidates is uncertain. Biomarker development for patient stratification lags behind drug development.",
-        proposed_hypothesis = f"The leading hypothesis proposes targeting key proteins in the disease pathway using validated drug candidates. This approach addresses core pathological mechanisms based on available evidence.",
-        supporting_evidence = "OpenTargets association scores support protein-disease links. FDA-approved or late-stage clinical drugs provide mechanistic validation. Research papers from PubMed support pathway involvement.",
-        risks_limitations   = "Correlation vs causation remains a key limitation. Safety signals detected in FDA FAERS require monitoring. Evidence base is moderate and may not fully support all conclusions.",
-        conclusion          = f"Based on current evidence, {disease} represents a tractable target for therapeutic intervention. The identified protein-drug combinations warrant further investigation. Experimental validation is recommended as an immediate next step.",
+        background          = (
+            f"{disease} is a complex disorder with significant unmet medical need. "
+            f"Current treatments address symptoms but do not modify disease progression. "
+            f"Significant research investment is ongoing to find disease-modifying therapies."
+        ),
+        current_research    = (
+            f"Research has focused on key protein targets including {proteins}. "
+            f"Multiple drug candidates including {drugs} have entered clinical evaluation. "
+            f"The field is moving toward combination approaches and precision medicine strategies."
+        ),
+        research_gaps       = (
+            "Direct causality between protein targets and disease progression remains incompletely established. "
+            "Long-term efficacy of current drug candidates is uncertain. "
+            "Biomarker development for patient stratification lags behind drug development."
+        ),
+        proposed_hypothesis = (
+            f"The leading hypothesis proposes targeting key proteins in the {disease} pathway. "
+            "This approach addresses core pathological mechanisms based on available evidence. "
+            "Validation studies are needed to confirm causal relationships."
+        ),
+        supporting_evidence = (
+            "OpenTargets association scores support protein-disease links. "
+            "FDA-approved or late-stage clinical drugs provide mechanistic validation. "
+            "Research papers from PubMed support pathway involvement."
+        ),
+        risks_limitations   = (
+            "Correlation vs causation remains a key limitation. "
+            "Safety signals detected in FDA FAERS require monitoring. "
+            "Evidence base is moderate and may not fully support all conclusions."
+        ),
+        conclusion          = (
+            f"Based on current evidence, {disease} represents a tractable target for intervention. "
+            "The identified protein-drug combinations warrant further investigation. "
+            "Experimental validation is recommended as an immediate next step."
+        ),
         generated_at        = datetime.now().strftime("%Y-%m-%d %H:%M")
     )
 
@@ -1232,11 +1294,16 @@ def generate_hypotheses(
     pipeline_result: DiseaseAnalysisResult,
     num_hypotheses:  int = 3
 ) -> list:
-    """Generate hypotheses via LLM then run all 7 analysis stages."""
+    """Generate hypotheses via LLM then run all 9 analysis stages."""
 
     if LLM_PROVIDER == "mock" or client is None:
         print("   ℹ️  Using mock hypotheses (no LLM key configured)")
-        hypotheses = get_mock_hypotheses(pipeline_result.disease_name)
+        # ← FIXED: pass real proteins and drugs
+        hypotheses = get_mock_hypotheses(
+            pipeline_result.disease_name,
+            pipeline_result.protein_targets,
+            pipeline_result.drugs
+        )
     else:
         evidence_context = build_llm_context(pipeline_result)
         user_prompt = HYPOTHESIS_PROMPT_TEMPLATE.format(
@@ -1259,15 +1326,24 @@ def generate_hypotheses(
             )
             raw_response = response.choices[0].message.content.strip()
             print(f"   ✅ LLM responded ({len(raw_response)} chars)")
+            # ← FIXED: pass real proteins and drugs to parse function
             hypotheses = parse_hypothesis_response(
-                raw_response, pipeline_result.disease_name
+                raw_response,
+                pipeline_result.disease_name,
+                pipeline_result.protein_targets,
+                pipeline_result.drugs
             )
         except Exception as e:
             print(f"   ❌ LLM error: {e}")
-            print("   ℹ️  Falling back to mock hypotheses")
-            hypotheses = get_mock_hypotheses(pipeline_result.disease_name)
+            print("   ℹ️  Falling back to disease-specific mock hypotheses")
+            # ← FIXED: pass real proteins and drugs
+            hypotheses = get_mock_hypotheses(
+                pipeline_result.disease_name,
+                pipeline_result.protein_targets,
+                pipeline_result.drugs
+            )
 
-    # ── All 9 stages run for BOTH mock and real ───────────────
+    # ── All 9 stages ──────────────────────────────────────────
     ranked = rank_hypotheses(hypotheses, pipeline_result)
     ranked = add_causal_analysis(ranked, pipeline_result)
     ranked = generate_validation_suggestions(ranked, pipeline_result)
@@ -1276,7 +1352,7 @@ def generate_hypotheses(
     ranked = add_hypothesis_go_no_go(ranked, pipeline_result)
     ranked = generate_failure_predictions(ranked, pipeline_result)
 
-    # ── Stage 8: Time-to-impact ───────────────────────────────
+    # Stage 8: Time-to-impact
     print("\n⏱️  Computing time-to-impact estimates...")
     for hyp in ranked:
         hyp.time_to_impact = compute_time_to_impact(hyp, pipeline_result)
@@ -1286,7 +1362,7 @@ def generate_hypotheses(
               f"{tti.years_range} | "
               f"Success: {tti.success_probability:.0%}")
 
-    # ── Stage 9: Executive summaries ─────────────────────────
+    # Stage 9: Executive summaries
     ranked = generate_executive_summaries(ranked, pipeline_result)
 
     return ranked
@@ -1296,30 +1372,19 @@ def generate_hypotheses(
 if __name__ == "__main__":
     from backend.services.pipeline_service import run_data_pipeline
 
-    print("🧬 AI Scientist V4 — Full Pipeline Test")
+    print("🧬 AI Scientist V5 — Mock Fallback Test")
     print("=" * 55)
 
-    pipeline_result = run_data_pipeline(
-        disease_name = "Alzheimer disease",
-        max_targets  = 5,
-        max_papers   = 4,
-        max_drugs    = 3
-    )
-
-    hypotheses = generate_hypotheses(pipeline_result, num_hypotheses=3)
-
-    print("\n" + "=" * 55)
-    print("📊 RANKED HYPOTHESES")
-    print("=" * 55)
-
-    medals = {1:"🥇",2:"🥈",3:"🥉"}
-    for h in hypotheses:
-        medal = medals.get(h.rank, f"#{h.rank}")
-        gng   = h.go_no_go
-        fp    = h.failure_prediction
-        print(f"\n{medal} Rank {h.rank} — Final Score: {h.final_score:.4f}")
-        print(f"   Title       : {h.title}")
-        print(f"   Confidence  : {h.confidence_score} ({h.confidence_label})")
-        print(f"   Decision    : {gng.decision_emoji} {gng.decision}" if gng else "   Decision: N/A")
-        print(f"   Failure Risk: {fp.failure_risk_label} | Success: {fp.success_probability:.0%}" if fp else "   Failure: N/A")
-        print(f"   Breakdown   : {h.score_breakdown}")
+    # Test that mock uses real disease proteins
+    for disease in ["Alkaptonuria", "Alzheimer disease", "Parkinson disease"]:
+        print(f"\n{'='*55}")
+        print(f"Testing: {disease}")
+        result = run_data_pipeline(disease, 5, 4, 3)
+        mocks  = get_mock_hypotheses(
+            disease,
+            result.protein_targets,
+            result.drugs
+        )
+        print(f"Mock hypothesis 1: {mocks[0].title}")
+        print(f"Mock hypothesis 2: {mocks[1].title}")
+        print(f"Mock hypothesis 3: {mocks[2].title}")
