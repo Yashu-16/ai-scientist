@@ -107,6 +107,187 @@
       ],
       "max_score": 0.8233,
       "appearances": 1
+    },
+    "BRCA2": {
+      "type": "protein",
+      "protein_name": "BRCA2 DNA repair associated",
+      "diseases": [
+        "breast cancer",
+        "Brain tumor"
+      ],
+      "max_score": 0.9178,
+      "appearances": 2
+    },
+    "BRCA1": {
+      "type": "protein",
+      "protein_name": "BRCA1 DNA repair associated",
+      "diseases": [
+        "breast cancer"
+      ],
+      "max_score": 0.9093,
+      "appearances": 1
+    },
+    "PIK3CA": {
+      "type": "protein",
+      "protein_name": "phosphatidylinositol-4,5-bisphosphate 3-kinase catalytic subunit alpha",
+      "diseases": [
+        "breast cancer"
+      ],
+      "max_score": 0.8802,
+      "appearances": 1
+    },
+    "PALB2": {
+      "type": "protein",
+      "protein_name": "partner and localizer of BRCA2",
+      "diseases": [
+        "breast cancer"
+      ],
+      "max_score": 0.8751,
+      "appearances": 1
+    },
+    "CHEK2": {
+      "type": "protein",
+      "protein_name": "checkpoint kinase 2",
+      "diseases": [
+        "breast cancer"
+      ],
+      "max_score": 0.8679,
+      "appearances": 1
+    },
+    "TLR7": {
+      "type": "protein",
+      "protein_name": "toll like receptor 7",
+      "diseases": [
+        "Covid19"
+      ],
+      "max_score": 0.5855,
+      "appearances": 1
+    },
+    "TP53": {
+      "type": "protein",
+      "protein_name": "tumor protein p53",
+      "diseases": [
+        "Brain tumor"
+      ],
+      "max_score": 0.8056,
+      "appearances": 1
+    },
+    "SUFU": {
+      "type": "protein",
+      "protein_name": "SUFU negative regulator of hedgehog signaling",
+      "diseases": [
+        "Brain tumor"
+      ],
+      "max_score": 0.8029,
+      "appearances": 1
+    },
+    "AIP": {
+      "type": "protein",
+      "protein_name": "AHR interacting HSP90 co-chaperone",
+      "diseases": [
+        "Brain tumor"
+      ],
+      "max_score": 0.7964,
+      "appearances": 1
+    },
+    "CTNNB1": {
+      "type": "protein",
+      "protein_name": "catenin beta 1",
+      "diseases": [
+        "Brain tumor"
+      ],
+      "max_score": 0.7784,
+      "appearances": 1
+    },
+    "IL4R": {
+      "type": "protein",
+      "protein_name": "interleukin 4 receptor",
+      "diseases": [
+        "Asthma"
+      ],
+      "max_score": 0.7427,
+      "appearances": 1
+    },
+    "FLG": {
+      "type": "protein",
+      "protein_name": "filaggrin",
+      "diseases": [
+        "Asthma"
+      ],
+      "max_score": 0.7375,
+      "appearances": 1
+    },
+    "ADORA1": {
+      "type": "protein",
+      "protein_name": "adenosine A1 receptor",
+      "diseases": [
+        "Asthma"
+      ],
+      "max_score": 0.7238,
+      "appearances": 1
+    },
+    "IL33": {
+      "type": "protein",
+      "protein_name": "interleukin 33",
+      "diseases": [
+        "Asthma"
+      ],
+      "max_score": 0.7209,
+      "appearances": 1
+    },
+    "TSLP": {
+      "type": "protein",
+      "protein_name": "thymic stromal lymphopoietin",
+      "diseases": [
+        "Asthma"
+      ],
+      "max_score": 0.7172,
+      "appearances": 1
+    },
+    "HGD": {
+      "type": "protein",
+      "protein_name": "homogentisate 1,2-dioxygenase",
+      "diseases": [
+        "Alkaptonuria"
+      ],
+      "max_score": 0.8502,
+      "appearances": 2
+    },
+    "HPD": {
+      "type": "protein",
+      "protein_name": "4-hydroxyphenylpyruvate dioxygenase",
+      "diseases": [
+        "Alkaptonuria"
+      ],
+      "max_score": 0.321,
+      "appearances": 2
+    },
+    "ENPP1": {
+      "type": "protein",
+      "protein_name": "ectonucleotide pyrophosphatase/phosphodiesterase 1",
+      "diseases": [
+        "Alkaptonuria"
+      ],
+      "max_score": 0.0462,
+      "appearances": 2
+    },
+    "SAA1": {
+      "type": "protein",
+      "protein_name": "serum amyloid A1",
+      "diseases": [
+        "Alkaptonuria"
+      ],
+      "max_score": 0.0332,
+      "appearances": 2
+    },
+    "MGP": {
+      "type": "protein",
+      "protein_name": "matrix Gla protein",
+      "diseases": [
+        "Alkaptonuria"
+      ],
+      "max_score": 0.0329,
+      "appearances": 2
     }
   },
   "edges": [
@@ -157,6 +338,134 @@
       "disease": "amyotrophic lateral sclerosis",
       "score": 0.5122,
       "added_at": "2026-04-05T15:56:21.542632"
+    },
+    {
+      "from": "PARP INHIBITORS",
+      "to": "BRCA2",
+      "relation": "hypothesis_link",
+      "disease": "breast cancer",
+      "score": 0.5471,
+      "added_at": "2026-04-07T17:56:58.101146"
+    },
+    {
+      "from": "PIK3CA INHIBITORS",
+      "to": "PALB2",
+      "relation": "hypothesis_link",
+      "disease": "breast cancer",
+      "score": 0.53,
+      "added_at": "2026-04-07T17:56:58.101146"
+    },
+    {
+      "from": "CHEK2 INHIBITORS",
+      "to": "CHEK2",
+      "relation": "hypothesis_link",
+      "disease": "breast cancer",
+      "score": 0.5272,
+      "added_at": "2026-04-07T17:56:58.101146"
+    },
+    {
+      "from": "TLR7 AGONISTS",
+      "to": "TLR7",
+      "relation": "hypothesis_link",
+      "disease": "Covid19",
+      "score": 0.4142,
+      "added_at": "2026-04-07T21:28:28.693804"
+    },
+    {
+      "from": "JAK INHIBITORS",
+      "to": "TLR7",
+      "relation": "hypothesis_link",
+      "disease": "Covid19",
+      "score": 0.4142,
+      "added_at": "2026-04-07T21:28:28.693804"
+    },
+    {
+      "from": "ARV-825",
+      "to": "TP53",
+      "relation": "hypothesis_link",
+      "disease": "Brain tumor",
+      "score": 0.5522,
+      "added_at": "2026-04-07T21:36:58.151268"
+    },
+    {
+      "from": "UNKNOWN DRUG TARGETING HEDGEHOG PATHWAY",
+      "to": "SUFU",
+      "relation": "hypothesis_link",
+      "disease": "Brain tumor",
+      "score": 0.5512,
+      "added_at": "2026-04-07T21:36:58.151268"
+    },
+    {
+      "from": "UNKNOWN DRUG TARGETING WNT SIGNALING",
+      "to": "CTNNB1",
+      "relation": "hypothesis_link",
+      "disease": "Brain tumor",
+      "score": 0.5414,
+      "added_at": "2026-04-07T21:36:58.151268"
+    },
+    {
+      "from": "DUPILUMAB",
+      "to": "IL4R",
+      "relation": "hypothesis_link",
+      "disease": "Asthma",
+      "score": 0.4771,
+      "added_at": "2026-04-07T21:40:26.347031"
+    },
+    {
+      "from": "ANTI-INFLAMMATORY AGENTS",
+      "to": "IL33",
+      "relation": "hypothesis_link",
+      "disease": "Asthma",
+      "score": 0.4684,
+      "added_at": "2026-04-07T21:40:26.347031"
+    },
+    {
+      "from": "NIROGACESTAT",
+      "to": "PSEN1",
+      "relation": "hypothesis_link",
+      "disease": "Alkaptonuria",
+      "score": 0.3,
+      "added_at": "2026-04-10T15:15:15.463157"
+    },
+    {
+      "from": "LECANEMAB",
+      "to": "APP",
+      "relation": "hypothesis_link",
+      "disease": "Alkaptonuria",
+      "score": 0.3,
+      "added_at": "2026-04-10T15:15:15.463157"
+    },
+    {
+      "from": "MEMANTINE",
+      "to": "GRIN1",
+      "relation": "hypothesis_link",
+      "disease": "Alkaptonuria",
+      "score": 0.3,
+      "added_at": "2026-04-10T15:15:15.463157"
+    },
+    {
+      "from": "POTENTIAL INHIBITOR",
+      "to": "HGD",
+      "relation": "hypothesis_link",
+      "disease": "Alkaptonuria",
+      "score": 0.5701,
+      "added_at": "2026-04-10T15:57:37.989800"
+    },
+    {
+      "from": "POTENTIAL INHIBITOR",
+      "to": "HPD",
+      "relation": "hypothesis_link",
+      "disease": "Alkaptonuria",
+      "score": 0.3584,
+      "added_at": "2026-04-10T15:57:37.989800"
+    },
+    {
+      "from": "POTENTIAL INHIBITOR",
+      "to": "SAA1",
+      "relation": "hypothesis_link",
+      "disease": "Alkaptonuria",
+      "score": 0.2433,
+      "added_at": "2026-04-10T15:57:37.989800"
     }
   ],
   "disease_analyses": {
@@ -173,14 +482,49 @@
       "top_protein": "SOD1",
       "confidence": 0.5359,
       "decision": "INVESTIGATE"
+    },
+    "breast cancer": {
+      "last_analyzed": "2026-04-07T17:56:58.101146",
+      "top_drug": "PARP inhibitors",
+      "top_protein": "BRCA2",
+      "confidence": 0.5471,
+      "decision": "INVESTIGATE"
+    },
+    "Covid19": {
+      "last_analyzed": "2026-04-07T21:28:28.693804",
+      "top_drug": "TLR7 agonists",
+      "top_protein": "TLR7",
+      "confidence": 0.4142,
+      "decision": "NO-GO"
+    },
+    "Brain tumor": {
+      "last_analyzed": "2026-04-07T21:36:58.151268",
+      "top_drug": "ARV-825",
+      "top_protein": "TP53",
+      "confidence": 0.5522,
+      "decision": "INVESTIGATE"
+    },
+    "Asthma": {
+      "last_analyzed": "2026-04-07T21:40:26.347031",
+      "top_drug": "Dupilumab",
+      "top_protein": "IL4R",
+      "confidence": 0.4771,
+      "decision": "NO-GO"
+    },
+    "Alkaptonuria": {
+      "last_analyzed": "2026-04-10T15:57:37.989800",
+      "top_drug": "Potential Inhibitor",
+      "top_protein": "HGD",
+      "confidence": 0.5701,
+      "decision": "INVESTIGATE"
     }
   },
   "stats": {
-    "total_analyses": 12,
-    "total_proteins": 10,
+    "total_analyses": 18,
+    "total_proteins": 30,
     "total_drugs": 2,
-    "total_edges": 6,
+    "total_edges": 22,
     "created_at": "2026-04-04T09:37:36.259481",
-    "last_updated": "2026-04-06T17:39:59.482753"
+    "last_updated": "2026-04-10T15:57:37.989800"
   }
 }

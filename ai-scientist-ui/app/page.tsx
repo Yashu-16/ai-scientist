@@ -1,11 +1,10 @@
 "use client"
-// app/landing/page.tsx — Marketing landing page
+// app/page.tsx — Landing page (root route)
 import Link from "next/link"
 import { useState, useEffect } from "react"
-import { loadAnalysis } from "@/lib/store"
 import {
   FlaskConical, Dna, TrendingUp, Shield,
-  ChevronRight, Activity, BarChart2,
+  ChevronRight, BarChart2,
   FileText, MessageSquare, RefreshCw, Zap, Star
 } from "lucide-react"
 
@@ -38,10 +37,8 @@ const PIPELINE = [
 
 export default function LandingPage() {
   const [diseaseIdx, setDiseaseIdx] = useState(0)
-  const [hasAnalysis, setHasAnalysis] = useState(false)
 
   useEffect(() => {
-    setHasAnalysis(!!loadAnalysis())
     const iv = setInterval(() => setDiseaseIdx(i => (i+1) % DISEASES_CYCLE.length), 2200)
     return () => clearInterval(iv)
   }, [])
@@ -58,18 +55,18 @@ export default function LandingPage() {
             </div>
             <div>
               <p className="text-sm font-bold text-gray-900 leading-none">AI Scientist</p>
-              <p className="text-[10px] text-gray-400">Drug Discovery V5</p>
+              <p className="text-[10px] text-gray-400">Drug Discovery</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <a href="http://localhost:8000/docs" target="_blank" rel="noopener noreferrer"
-               className="text-sm text-gray-500 hover:text-gray-800 transition-colors hidden sm:block">
-              API Docs
-            </a>
-            <Link href={hasAnalysis ? "/dashboard" : "/analysis"}
+            <Link href="/auth/login"
+               className="text-sm text-gray-500 hover:text-gray-800 transition-colors hidden sm:block font-medium">
+              Sign In
+            </Link>
+            <Link href="/auth/register"
               className="flex items-center gap-1.5 text-sm font-bold bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors shadow-sm">
               <FlaskConical className="h-3.5 w-3.5" />
-              {hasAnalysis ? "Open App" : "Get Started"}
+              Get Started Free
             </Link>
           </div>
         </div>
@@ -77,14 +74,13 @@ export default function LandingPage() {
 
       {/* HERO */}
       <section className="pt-36 pb-24 px-6 relative overflow-hidden">
-        {/* Background blur orbs */}
         <div className="absolute top-20 left-1/4 w-96 h-96 bg-blue-100 rounded-full blur-3xl opacity-40 -z-10" />
         <div className="absolute top-40 right-1/4 w-72 h-72 bg-purple-100 rounded-full blur-3xl opacity-30 -z-10" />
 
         <div className="max-w-4xl mx-auto text-center">
           <div className="inline-flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-full px-4 py-1.5 mb-6">
             <span className="flex h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
-            <span className="text-xs font-bold text-blue-700 uppercase tracking-wide">V5 · Decision & Risk Intelligence Platform</span>
+            <span className="text-xs font-bold text-blue-700 uppercase tracking-wide">Decision & Risk Intelligence Platform</span>
           </div>
 
           <h1 className="text-5xl sm:text-6xl font-black text-gray-900 leading-tight mb-4 tracking-tight">
@@ -112,22 +108,20 @@ export default function LandingPage() {
           </p>
 
           <div className="flex items-center justify-center flex-wrap gap-3">
-            <Link href="/analysis"
+            <Link href="/auth/register"
               className="flex items-center gap-2 bg-blue-600 text-white px-8 py-3.5 rounded-xl font-black text-sm hover:bg-blue-700 transition-all shadow-lg hover:shadow-blue-200 hover:-translate-y-0.5">
               <Zap className="h-4 w-4" />
-              {hasAnalysis ? "Run New Analysis" : "Start Free Analysis"}
+              Start Free Analysis
               <ChevronRight className="h-4 w-4" />
             </Link>
-            {hasAnalysis && (
-              <Link href="/"
-                className="flex items-center gap-2 bg-white border-2 border-gray-200 text-gray-700 px-6 py-3 rounded-xl font-bold text-sm hover:border-blue-300 hover:text-blue-700 transition-all">
-                <BarChart2 className="h-4 w-4" />
-                View Dashboard
-              </Link>
-            )}
+            <Link href="/auth/login"
+              className="flex items-center gap-2 bg-white border-2 border-gray-200 text-gray-700 px-6 py-3 rounded-xl font-bold text-sm hover:border-blue-300 hover:text-blue-700 transition-all">
+              <BarChart2 className="h-4 w-4" />
+              Sign In
+            </Link>
           </div>
 
-          <p className="text-gray-400 text-xs mt-5">No signup required · Runs locally · FastAPI + GPT-4o-mini</p>
+          <p className="text-gray-400 text-xs mt-5">Free plan includes 3 analyses · No credit card required</p>
         </div>
       </section>
 
@@ -242,6 +236,39 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* PRICING TEASER */}
+      <section className="py-16 px-6 bg-gray-50">
+        <div className="max-w-3xl mx-auto text-center">
+          <p className="text-xs font-bold text-blue-600 uppercase tracking-widest mb-4">Simple pricing</p>
+          <h2 className="text-3xl font-black text-gray-900 mb-3">Start free, upgrade when ready</h2>
+          <p className="text-gray-500 text-sm mb-8">No credit card required for the free plan</p>
+          <div className="grid grid-cols-3 gap-4 mb-8">
+            {[
+              { plan:"Free",         price:"₹0",        analyses:"3 analyses/month",  cta:"Get Started",  highlight: false },
+              { plan:"Academic",     price:"₹999/mo",   analyses:"50 analyses/month", cta:"Start Trial",  highlight: true  },
+              { plan:"Professional", price:"₹4,999/mo", analyses:"Unlimited",         cta:"Start Trial",  highlight: false },
+            ].map(({ plan, price, analyses, cta, highlight }) => (
+              <div key={plan} className={`bg-white rounded-2xl p-6 border ${highlight ? "border-blue-500 ring-2 ring-blue-100" : "border-gray-200"}`}>
+                <p className="text-sm font-bold text-gray-900 mb-1">{plan}</p>
+                <p className={`text-2xl font-black mb-1 ${highlight ? "text-blue-600" : "text-gray-900"}`}>{price}</p>
+                <p className="text-xs text-gray-400 mb-4">{analyses}</p>
+                <Link href="/auth/register"
+                  className={`block text-center py-2 rounded-xl text-xs font-bold transition-colors ${
+                    highlight
+                      ? "bg-blue-600 text-white hover:bg-blue-700"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  }`}>
+                  {cta}
+                </Link>
+              </div>
+            ))}
+          </div>
+          <Link href="/pricing" className="text-sm text-blue-600 hover:text-blue-800 font-medium">
+            View full pricing →
+          </Link>
+        </div>
+      </section>
+
       {/* CTA BOTTOM */}
       <section className="py-24 px-6 bg-gradient-to-br from-blue-600 to-blue-900 relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-500/20 to-transparent" />
@@ -255,33 +282,44 @@ export default function LandingPage() {
             Ready to discover your next drug candidate?
           </h2>
           <p className="text-blue-200 mb-10 leading-relaxed">
-            Enter any disease name and get a full GO/NO-GO recommendation with protein targets,
-            drug risk profiles, failure predictions, and a downloadable PDF report — all in under 90 seconds.
+            Create a free account and get a full GO/NO-GO recommendation with protein targets,
+            drug risk profiles, failure predictions, and a downloadable PDF report — in under 90 seconds.
           </p>
-          <Link href="/analysis"
-            className="inline-flex items-center gap-2 bg-white text-blue-700 px-10 py-4 rounded-2xl font-black text-base hover:bg-blue-50 transition-all shadow-2xl hover:-translate-y-1 active:translate-y-0">
-            <FlaskConical className="h-5 w-5" />
-            Start Free Analysis
-            <ChevronRight className="h-5 w-5" />
-          </Link>
-          <p className="text-blue-300 text-xs mt-5">No signup · Runs locally · FastAPI + GPT-4o-mini + Next.js</p>
+          <div className="flex items-center justify-center gap-3 flex-wrap">
+            <Link href="/auth/register"
+              className="inline-flex items-center gap-2 bg-white text-blue-700 px-10 py-4 rounded-2xl font-black text-base hover:bg-blue-50 transition-all shadow-2xl hover:-translate-y-1 active:translate-y-0">
+              <FlaskConical className="h-5 w-5" />
+              Create Free Account
+              <ChevronRight className="h-5 w-5" />
+            </Link>
+            <Link href="/auth/login"
+              className="inline-flex items-center gap-2 bg-blue-700/50 text-white px-6 py-4 rounded-2xl font-bold text-base hover:bg-blue-700 transition-all border border-blue-500">
+              Sign In
+            </Link>
+          </div>
+          <p className="text-blue-300 text-xs mt-5">Free plan · 3 analyses/month · No credit card required</p>
         </div>
       </section>
 
       {/* FOOTER */}
       <footer className="py-8 px-6 bg-gray-950 border-t border-gray-800">
-      <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
-        <span>FastAPI + Next.js + GPT-4o-mini</span>
-        <span>·</span>
-        <a href="/terms"   className="hover:text-gray-300 transition-colors">Terms</a>
-        <span>·</span>
-        <a href="/privacy" className="hover:text-gray-300 transition-colors">Privacy</a>
-        <span>·</span>
-        <span>For exploratory research only. Not for clinical use.</span>
-        <span>·</span>
-        <a href="http://localhost:8000/docs" target="_blank" rel="noopener noreferrer"
-        className="hover:text-gray-300 transition-colors">API Docs →</a>
-      </div>
+        <div className="max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <div className="h-6 w-6 rounded bg-blue-600 flex items-center justify-center">
+              <Dna className="h-3 w-3 text-white" />
+            </div>
+            <p className="text-sm font-semibold text-gray-400">AI Scientist</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
+            <span>FastAPI + Next.js + GPT-4o-mini</span>
+            <span>·</span>
+            <Link href="/terms"   className="hover:text-gray-300 transition-colors">Terms</Link>
+            <span>·</span>
+            <Link href="/privacy" className="hover:text-gray-300 transition-colors">Privacy</Link>
+            <span>·</span>
+            <span>For exploratory research only. Not for clinical use.</span>
+          </div>
+        </div>
       </footer>
     </div>
   )
