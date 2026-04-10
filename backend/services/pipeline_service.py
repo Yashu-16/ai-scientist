@@ -643,7 +643,9 @@ def run_data_pipeline(
         future_drugs  = executor.submit(
             fetch_drug_data_for_disease,
             target_dicts,
-            max_drugs
+            max_drugs,
+            result.disease_id,
+            disease_name,
         )
         future_papers = executor.submit(
             fetch_papers_stage,

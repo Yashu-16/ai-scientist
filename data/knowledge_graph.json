@@ -251,7 +251,7 @@
         "Alkaptonuria"
       ],
       "max_score": 0.8502,
-      "appearances": 2
+      "appearances": 4
     },
     "HPD": {
       "type": "protein",
@@ -260,7 +260,7 @@
         "Alkaptonuria"
       ],
       "max_score": 0.321,
-      "appearances": 2
+      "appearances": 4
     },
     "ENPP1": {
       "type": "protein",
@@ -269,7 +269,7 @@
         "Alkaptonuria"
       ],
       "max_score": 0.0462,
-      "appearances": 2
+      "appearances": 4
     },
     "SAA1": {
       "type": "protein",
@@ -278,7 +278,7 @@
         "Alkaptonuria"
       ],
       "max_score": 0.0332,
-      "appearances": 2
+      "appearances": 4
     },
     "MGP": {
       "type": "protein",
@@ -287,7 +287,43 @@
         "Alkaptonuria"
       ],
       "max_score": 0.0329,
-      "appearances": 2
+      "appearances": 4
+    },
+    "PEMBROLIZUMAB": {
+      "type": "drug",
+      "drug_name": "Pembrolizumab",
+      "drug_type": "Antibody",
+      "phase": 4,
+      "mechanism": "Programmed cell death protein 1 inhibitor",
+      "risk_level": "High",
+      "appearances": 1
+    },
+    "NIVOLUMAB": {
+      "type": "drug",
+      "drug_name": "Nivolumab",
+      "drug_type": "Antibody",
+      "phase": 4,
+      "mechanism": "Programmed cell death protein 1 inhibitor",
+      "risk_level": "High",
+      "appearances": 1
+    },
+    "CADONILIMAB": {
+      "type": "drug",
+      "drug_name": "Cadonilimab",
+      "drug_type": "Antibody",
+      "phase": 0,
+      "mechanism": "Programmed cell death protein 1 inhibitor",
+      "risk_level": "Low",
+      "appearances": 1
+    },
+    "NITISINONE": {
+      "type": "drug",
+      "drug_name": "Nitisinone",
+      "drug_type": "Small molecule",
+      "phase": 4,
+      "mechanism": "4-hydroxyphenylpyruvate dioxygenase inhibitor",
+      "risk_level": "Low",
+      "appearances": 1
     }
   },
   "edges": [
@@ -466,6 +502,46 @@
       "disease": "Alkaptonuria",
       "score": 0.2433,
       "added_at": "2026-04-10T15:57:37.989800"
+    },
+    {
+      "from": "PEMBROLIZUMAB",
+      "to": "PDCD1",
+      "relation": "targets",
+      "disease": "Alkaptonuria",
+      "score": 0.5,
+      "added_at": "2026-04-10T16:19:28.988420"
+    },
+    {
+      "from": "NIVOLUMAB",
+      "to": "PDCD1",
+      "relation": "targets",
+      "disease": "Alkaptonuria",
+      "score": 0.5,
+      "added_at": "2026-04-10T16:19:28.988420"
+    },
+    {
+      "from": "CADONILIMAB",
+      "to": "PDCD1",
+      "relation": "targets",
+      "disease": "Alkaptonuria",
+      "score": 0.5,
+      "added_at": "2026-04-10T16:19:28.988420"
+    },
+    {
+      "from": "NITISINONE",
+      "to": "HGD",
+      "relation": "hypothesis_link",
+      "disease": "Alkaptonuria",
+      "score": 0.5701,
+      "added_at": "2026-04-10T16:19:28.988420"
+    },
+    {
+      "from": "NITISINONE",
+      "to": "HPD",
+      "relation": "hypothesis_link",
+      "disease": "Alkaptonuria",
+      "score": 0.6184,
+      "added_at": "2026-04-10T16:19:28.988420"
     }
   ],
   "disease_analyses": {
@@ -512,19 +588,19 @@
       "decision": "NO-GO"
     },
     "Alkaptonuria": {
-      "last_analyzed": "2026-04-10T15:57:37.989800",
-      "top_drug": "Potential Inhibitor",
-      "top_protein": "HGD",
-      "confidence": 0.5701,
+      "last_analyzed": "2026-04-10T16:26:54.565142",
+      "top_drug": "Nitisinone",
+      "top_protein": "HPD",
+      "confidence": 0.6184,
       "decision": "INVESTIGATE"
     }
   },
   "stats": {
-    "total_analyses": 18,
+    "total_analyses": 20,
     "total_proteins": 30,
-    "total_drugs": 2,
-    "total_edges": 22,
+    "total_drugs": 6,
+    "total_edges": 27,
     "created_at": "2026-04-04T09:37:36.259481",
-    "last_updated": "2026-04-10T15:57:37.989800"
+    "last_updated": "2026-04-10T16:26:54.565142"
   }
 }

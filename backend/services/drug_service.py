@@ -1,215 +1,133 @@
 # backend/services/drug_service.py
-# V2 — Feature 3: FDA Risk Intelligence Layer
-# Adds risk_level + risk_description to every drug
-# based on adverse event report counts from FDA FAERS
+# V4 — Real drug data using verified OpenTargets v4 API
+# Strategy: search drugs by disease name → get mechanisms → FDA risk
 
 import requests
 
 OPENTARGETS_API = "https://api.platform.opentargets.org/api/v4/graphql"
 FDA_FAERS_API   = "https://api.fda.gov/drug/event.json"
 
-# ── Risk Classification Rules ─────────────────────────────────
-# Based on total adverse event reports for the top reaction
+# ── Clinical Stage Mapping ────────────────────────────────────
+STAGE_TO_PHASE = {
+    "APPROVAL":   4,
+    "PHASE4":     4,
+    "PHASE3":     3,
+    "PHASE2":     2,
+    "PHASE1":     1,
+    "PRECLINICAL":0,
+    "UNKNOWN":    0,
+}
+
+# ── Risk Classification ───────────────────────────────────────
 RISK_TIERS = [
-    (200, "High",    "#ef4444",
+    (200, "High",   "#ef4444",
      "High volume of adverse event reports. Significant safety signals detected in FDA FAERS. "
      "Requires careful benefit-risk evaluation before therapeutic consideration."),
-    (50,  "Medium",  "#f59e0b",
+    (50,  "Medium", "#f59e0b",
      "Moderate adverse event reporting. Safety signals present but within manageable range. "
      "Standard clinical monitoring protocols recommended."),
-    (0,   "Low",     "#22c55e",
+    (0,   "Low",    "#22c55e",
      "Low adverse event signal. Limited safety concerns detected in FDA FAERS database. "
      "Favorable safety profile for further investigation."),
 ]
 
-# Fallback mock data for proteins without direct drug targets
-MOCK_DRUG_DATA = {
-    "APOE": [{
-        "drug_name":     "Bexarotene",
-        "drug_type":     "Small molecule",
-        "clinical_phase": 2,
-        "mechanism":     "APOE expression modulator — increases APOE-mediated amyloid clearance",
-        "description":   "Retinoid X receptor agonist investigated for Alzheimer's via APOE pathway",
-        "target_gene":   "APOE"
-    }],
-    "APP": [{
-        "drug_name":     "Lecanemab",
-        "drug_type":     "Antibody",
-        "clinical_phase": 4,
-        "mechanism":     "Amyloid beta aggregation inhibitor targeting APP cleavage products",
-        "description":   "FDA-approved monoclonal antibody targeting amyloid-beta protofibrils",
-        "target_gene":   "APP"
-    }],
-    "PSEN1": [{
-        "drug_name":     "Semagacestat",
-        "drug_type":     "Small molecule",
-        "clinical_phase": 3,
-        "mechanism":     "Gamma-secretase inhibitor — blocks PSEN1-mediated APP cleavage",
-        "description":   "Investigated gamma-secretase inhibitor targeting PSEN1",
-        "target_gene":   "PSEN1"
-    }],
-    "GRIN1": [{
-        "drug_name":     "Memantine",
-        "drug_type":     "Small molecule",
-        "clinical_phase": 4,
-        "mechanism":     "NMDA receptor antagonist — modulates GRIN1-containing receptor activity",
-        "description":   "FDA-approved NMDA receptor antagonist for Alzheimer's",
-        "target_gene":   "GRIN1"
-    }],
-    "BACE1": [{
-        "drug_name":     "Verubecestat",
-        "drug_type":     "Small molecule",
-        "clinical_phase": 3,
-        "mechanism":     "BACE1 inhibitor — reduces amyloid-beta production",
-        "description":   "BACE1 inhibitor investigated in Alzheimer's clinical trials",
-        "target_gene":   "BACE1"
-    }]
-}
-
-# ── Drug Class Competition Database ──────────────────────────
-# Curated competitive landscape for major drug classes
-# Used for market intelligence without requiring additional APIs
-
+# ── Competition Database ──────────────────────────────────────
 DRUG_CLASS_COMPETITION = {
-    # Gamma-secretase inhibitors/modulators
     "gamma-secretase inhibitor": {
-        "class":        "Gamma-secretase inhibitor",
-        "similar_drugs":["Semagacestat","Avagacestat","BMS-708163",
-                         "LY-450139","MK-0752","PF-3084014"],
-        "level":        "High",
-        "opportunity":  "Crowded",
-        "note":         "Highly competitive class; multiple Phase 3 failures. Differentiation required."
+        "class": "Gamma-secretase inhibitor",
+        "similar_drugs": ["Semagacestat","Avagacestat","BMS-708163","LY-450139","MK-0752"],
+        "level": "Medium", "opportunity": "Moderate",
+        "note": "Multiple Phase 3 failures. Differentiation required."
     },
-    "gamma-secretase modulator": {
-        "class":        "Gamma-secretase modulator",
-        "similar_drugs":["Tarenflurbil","CHF-5074","NIC5-15"],
-        "level":        "Medium",
-        "opportunity":  "Moderate",
-        "note":         "Modulator class less crowded than inhibitors; better safety profile sought."
-    },
-    # Amyloid-beta antibodies
     "amyloid-beta": {
-        "class":        "Amyloid-beta antibody",
-        "similar_drugs":["Aducanumab","Lecanemab","Donanemab",
-                         "Gantenerumab","Solanezumab","Crenezumab"],
-        "level":        "High",
-        "opportunity":  "Crowded",
-        "note":         "Highly competitive; FDA approvals exist. Strong clinical precedent but crowded."
+        "class": "Amyloid-beta antibody",
+        "similar_drugs": ["Aducanumab","Lecanemab","Donanemab","Gantenerumab","Solanezumab"],
+        "level": "High", "opportunity": "Crowded",
+        "note": "Highly competitive. FDA approvals exist."
     },
-    "amyloid beta": {
-        "class":        "Amyloid-beta targeting agent",
-        "similar_drugs":["Aducanumab","Lecanemab","Donanemab","Gantenerumab"],
-        "level":        "High",
-        "opportunity":  "Crowded",
-        "note":         "Major pharma companies active. Requires significant differentiation."
-    },
-    # BACE inhibitors
     "bace": {
-        "class":        "BACE inhibitor",
-        "similar_drugs":["Verubecestat","Atabecestat","Lanabecestat",
-                         "Elenbecestat","CNP520"],
-        "level":        "Medium",
-        "opportunity":  "Moderate",
-        "note":         "Multiple Phase 3 failures. Space less crowded now; selective inhibitors sought."
+        "class": "BACE inhibitor",
+        "similar_drugs": ["Verubecestat","Atabecestat","Lanabecestat","Elenbecestat"],
+        "level": "Medium", "opportunity": "Moderate",
+        "note": "Multiple Phase 3 failures."
     },
-    # NMDA antagonists
     "nmda": {
-        "class":        "NMDA receptor antagonist",
-        "similar_drugs":["Memantine","Ketamine","Esketamine",
-                         "Nitromemantine","NitroSynapsin"],
-        "level":        "Medium",
-        "opportunity":  "Moderate",
-        "note":         "Established class with marketed drugs. Novel mechanisms needed."
+        "class": "NMDA receptor antagonist",
+        "similar_drugs": ["Memantine","Ketamine","Esketamine","Nitromemantine"],
+        "level": "Medium", "opportunity": "Moderate",
+        "note": "Established class. Novel mechanisms needed."
     },
-    # LRRK2 inhibitors (Parkinson's)
     "lrrk2": {
-        "class":        "LRRK2 kinase inhibitor",
-        "similar_drugs":["DNL201","DNL151","BIIB122","PF-06685360"],
-        "level":        "Medium",
-        "opportunity":  "Moderate",
-        "note":         "Active clinical development. First-in-class advantage still possible."
+        "class": "LRRK2 kinase inhibitor",
+        "similar_drugs": ["DNL201","DNL151","BIIB122","PF-06685360"],
+        "level": "Medium", "opportunity": "Moderate",
+        "note": "Active clinical development."
     },
-    # Alpha-synuclein antibodies
     "alpha-synuclein": {
-        "class":        "Alpha-synuclein antibody",
-        "similar_drugs":["Prasinezumab","Cinpanemab","Buntanetap",
-                         "MEDI1341","Lu AF82422"],
-        "level":        "Medium",
-        "opportunity":  "Moderate",
-        "note":         "Multiple Phase 2 programs active. Target validation still ongoing."
+        "class": "Alpha-synuclein antibody",
+        "similar_drugs": ["Prasinezumab","Cinpanemab","Buntanetap","MEDI1341"],
+        "level": "Medium", "opportunity": "Moderate",
+        "note": "Multiple Phase 2 programs active."
     },
-    # HER2 targeting (cancer)
     "her2": {
-        "class":        "HER2-targeting agent",
-        "similar_drugs":["Trastuzumab","Pertuzumab","Lapatinib",
-                         "Neratinib","Tucatinib","T-DM1","T-DXd"],
-        "level":        "High",
-        "opportunity":  "Crowded",
-        "note":         "Extremely competitive class. Multiple approved agents. Combination strategies needed."
+        "class": "HER2-targeting agent",
+        "similar_drugs": ["Trastuzumab","Pertuzumab","Lapatinib","Neratinib","Tucatinib"],
+        "level": "High", "opportunity": "Crowded",
+        "note": "Extremely competitive class."
     },
-    # CDK4/6 inhibitors
     "cdk": {
-        "class":        "CDK inhibitor",
-        "similar_drugs":["Palbociclib","Ribociclib","Abemaciclib",
-                         "Trilaciclib","Lerociclib"],
-        "level":        "High",
-        "opportunity":  "Crowded",
-        "note":         "3 approved CDK4/6 inhibitors dominate breast cancer. Differentiation critical."
+        "class": "CDK inhibitor",
+        "similar_drugs": ["Palbociclib","Ribociclib","Abemaciclib","Trilaciclib"],
+        "level": "High", "opportunity": "Crowded",
+        "note": "3 approved CDK4/6 inhibitors dominate."
     },
-    # GLP-1 agonists (diabetes)
     "glp": {
-        "class":        "GLP-1 receptor agonist",
-        "similar_drugs":["Semaglutide","Liraglutide","Dulaglutide",
-                         "Exenatide","Tirzepatide"],
-        "level":        "High",
-        "opportunity":  "Crowded",
-        "note":         "Blockbuster class. Semaglutide dominates. Differentiation through delivery or combo needed."
+        "class": "GLP-1 receptor agonist",
+        "similar_drugs": ["Semaglutide","Liraglutide","Dulaglutide","Tirzepatide"],
+        "level": "High", "opportunity": "Crowded",
+        "note": "Blockbuster class. Semaglutide dominates."
     },
-    # Default for unknown
+    "hppd": {
+        "class": "HPPD inhibitor",
+        "similar_drugs": ["Nitisinone","NTBC"],
+        "level": "Low", "opportunity": "Strong",
+        "note": "Limited competition. Nitisinone is only approved drug."
+    },
+    "dopamine": {
+        "class": "Dopamine modulator",
+        "similar_drugs": ["Levodopa","Pramipexole","Ropinirole","Rotigotine"],
+        "level": "High", "opportunity": "Crowded",
+        "note": "Well-established class for Parkinson's."
+    },
+    "tyrosine": {
+        "class": "Tyrosine metabolism modulator",
+        "similar_drugs": ["Nitisinone","Orfadin"],
+        "level": "Low", "opportunity": "Strong",
+        "note": "Rare disease space — limited competition."
+    },
+    "insulin": {
+        "class": "Insulin sensitizer / secretagogue",
+        "similar_drugs": ["Metformin","Sitagliptin","Empagliflozin","Liraglutide"],
+        "level": "High", "opportunity": "Crowded",
+        "note": "Extremely competitive diabetes space."
+    },
     "default": {
-        "class":        "Unknown drug class",
-        "similar_drugs":[],
-        "level":        "Low",
-        "opportunity":  "Strong",
-        "note":         "Limited competition data available. Potentially novel mechanism."
+        "class": "Unknown drug class",
+        "similar_drugs": [],
+        "level": "Low", "opportunity": "Strong",
+        "note": "Limited competition data. Potentially novel mechanism."
     }
 }
 
-COMPETITION_COLORS = {
-    "Low":    "#22c55e",
-    "Medium": "#f59e0b",
-    "High":   "#ef4444"
-}
-
-OPPORTUNITY_COLORS = {
-    "Strong":   "#22c55e",
-    "Moderate": "#f59e0b",
-    "Crowded":  "#ef4444"
-}
+COMPETITION_COLORS = {"Low": "#22c55e", "Medium": "#f59e0b", "High": "#ef4444"}
+OPPORTUNITY_COLORS = {"Strong": "#22c55e", "Moderate": "#f59e0b", "Crowded": "#ef4444"}
 
 
-def classify_competition(
-    drug_name:  str,
-    mechanism:  str,
-    drug_type:  str
-) -> "CompetitionIntel":
-    """
-    Classify competitive landscape for a drug based on mechanism.
-
-    Args:
-        drug_name : Name of the drug
-        mechanism : Mechanism of action string
-        drug_type : Drug type (Small molecule / Antibody / etc.)
-
-    Returns:
-        CompetitionIntel object
-    """
+def classify_competition(drug_name: str, mechanism: str, drug_type: str):
+    """Classify competitive landscape for a drug."""
     from backend.models.schemas import CompetitionIntel
-
     mechanism_lower = mechanism.lower()
     drug_lower      = drug_name.lower()
-
-    # Match against competition database
     matched = None
     for keyword, data in DRUG_CLASS_COMPETITION.items():
         if keyword == "default":
@@ -217,17 +135,11 @@ def classify_competition(
         if keyword in mechanism_lower or keyword in drug_lower:
             matched = data
             break
-
     if not matched:
         matched = DRUG_CLASS_COMPETITION["default"]
-
-    # Remove the drug itself from similar drugs list
-    similar = [d for d in matched["similar_drugs"]
-               if d.lower() != drug_lower][:5]
-
-    level = matched["level"]
-    color = COMPETITION_COLORS.get(level, "#64748b")
-
+    similar = [d for d in matched["similar_drugs"] if d.lower() != drug_lower][:5]
+    level   = matched["level"]
+    color   = COMPETITION_COLORS.get(level, "#64748b")
     return CompetitionIntel(
         competition_level  = level,
         competition_color  = color,
@@ -240,21 +152,7 @@ def classify_competition(
 
 
 def classify_fda_risk(adverse_events: list) -> tuple:
-    """
-    Classify drug risk level based on FDA adverse event counts.
-
-    Args:
-        adverse_events: list of {reaction, count} dicts
-
-    Returns:
-        (risk_level, risk_description, risk_color) tuple
-
-    Risk Tiers:
-        High   → top reaction >200 reports
-        Medium → top reaction 50–200 reports
-        Low    → top reaction <50 reports
-        None   → no adverse event data found
-    """
+    """Classify drug risk from FDA adverse event counts."""
     if not adverse_events:
         return (
             "Unknown",
@@ -262,184 +160,323 @@ def classify_fda_risk(adverse_events: list) -> tuple:
             "Insufficient safety signal data for risk classification.",
             "#64748b"
         )
-
     top_count = adverse_events[0].get("count", 0)
-
     for threshold, level, color, description in RISK_TIERS:
         if top_count > threshold:
             return (level, description, color)
-
     return ("Low", RISK_TIERS[2][3], "#22c55e")
 
 
-def fetch_drugs_for_protein(
-    ensembl_id:  str,
-    gene_symbol: str,
-    max_drugs:   int = 5
-) -> list:
+def parse_clinical_stage(stage_str: str) -> int:
+    """Convert OpenTargets stage string to numeric phase."""
+    if not stage_str:
+        return 0
+    return STAGE_TO_PHASE.get(stage_str.upper().replace(" ", ""), 0)
+
+
+def fetch_drugs_by_disease_name(disease_name: str, max_drugs: int = 10) -> list:
     """
-    Fetch known drugs for a protein from OpenTargets.
-    Falls back to mock data if API returns nothing.
+    PRIMARY: Search OpenTargets for drugs by disease name.
+    Uses verified search API that returns real drug data.
     """
     query = """
-    query ProteinDrugs($targetId: String!, $size: Int!) {
-      target(ensemblId: $targetId) {
-        id
-        approvedSymbol
-        knownDrugs(size: $size) {
-          rows {
-            drug {
-              id
+    query SearchDrugs($disease: String!, $size: Int!) {
+      search(queryString: $disease,
+             entityNames: ["drug"],
+             page: {index: 0, size: $size}) {
+        hits {
+          id
+          name
+          object {
+            ... on Drug {
               name
+              maximumClinicalStage
               drugType
-              maximumClinicalTrialPhase
               description
+              mechanismsOfAction {
+                rows {
+                  mechanismOfAction
+                  targets { approvedSymbol }
+                }
+              }
             }
-            mechanismOfAction
           }
         }
       }
     }
     """
-    variables = {"targetId": ensembl_id, "size": max_drugs}
-
     try:
         response = requests.post(
             OPENTARGETS_API,
-            json={"query": query, "variables": variables},
+            json={"query": query, "variables": {"disease": disease_name, "size": max_drugs}},
             headers={"Content-Type": "application/json"},
             timeout=30
         )
         response.raise_for_status()
         data = response.json()
-
-        target_data = data.get("data", {}).get("target", {})
-        rows = target_data.get("knownDrugs", {}).get("rows", []) if target_data else []
+        hits = data.get("data", {}).get("search", {}).get("hits", [])
 
         drugs      = []
         seen_drugs = set()
 
-        for row in rows:
-            drug      = row.get("drug", {})
-            drug_name = drug.get("name", "Unknown")
-            if drug_name in seen_drugs:
+        for hit in hits:
+            obj = hit.get("object", {})
+            if not obj:
                 continue
-            seen_drugs.add(drug_name)
+
+            drug_name   = obj.get("name", "")
+            if not drug_name or drug_name.upper() in seen_drugs:
+                continue
+
+            # Filter: only include drugs whose description mentions the disease
+            description   = obj.get("description", "").lower()
+            disease_lower = disease_name.lower()
+            disease_words = [w for w in disease_lower.split() if len(w) > 4]
+
+            # For small result sets accept all; for large sets filter by relevance
+            if len(hits) > 3:
+                if disease_lower not in description:
+                    if not any(w in description for w in disease_words):
+                        continue
+
+            seen_drugs.add(drug_name.upper())
+
+            # Get mechanism and target gene
+            mechanism   = "Unknown mechanism"
+            target_gene = ""
+            moa_rows    = obj.get("mechanismsOfAction", {}).get("rows", [])
+            if moa_rows:
+                mechanism = moa_rows[0].get("mechanismOfAction", "Unknown mechanism")
+                targets   = moa_rows[0].get("targets", [])
+                if targets:
+                    target_gene = targets[0].get("approvedSymbol", "")
+
+            phase = parse_clinical_stage(obj.get("maximumClinicalStage", ""))
 
             drugs.append({
-                "drug_name":     drug_name,
-                "drug_id":       drug.get("id", ""),
-                "drug_type":     drug.get("drugType", "Unknown"),
-                "clinical_phase": drug.get("maximumClinicalTrialPhase"),
-                "mechanism":     row.get("mechanismOfAction", "Unknown mechanism"),
-                "description":   (drug.get("description") or "")[:200],
-                "target_gene":   gene_symbol
+                "drug_name":      drug_name.title(),
+                "drug_id":        hit.get("id", ""),
+                "drug_type":      obj.get("drugType", "Unknown"),
+                "clinical_phase": phase,
+                "mechanism":      mechanism,
+                "description":    obj.get("description", "")[:200],
+                "target_gene":    target_gene,
+                "status":         obj.get("maximumClinicalStage", ""),
             })
 
-        if not drugs and gene_symbol in MOCK_DRUG_DATA:
-            print(f"     ℹ️  No API drugs for {gene_symbol} — using fallback")
-            drugs = MOCK_DRUG_DATA[gene_symbol]
-
+        print(f"  Disease drug search '{disease_name}': {len(drugs)} drugs found")
         return drugs
 
-    except requests.exceptions.RequestException as e:
-        print(f"  Drug fetch error for {gene_symbol}: {e}")
-        return MOCK_DRUG_DATA.get(gene_symbol, [])
+    except Exception as e:
+        print(f"  Drug search error for {disease_name}: {e}")
+        return []
+
+
+def fetch_drugs_for_protein_targets(
+    protein_targets: list,
+    disease_name:    str,
+    max_drugs:       int = 5
+) -> list:
+    """
+    FALLBACK: Search drugs for each protein target individually.
+    """
+    query = """
+    query SearchProteinDrug($term: String!, $size: Int!) {
+      search(queryString: $term,
+             entityNames: ["drug"],
+             page: {index: 0, size: $size}) {
+        hits {
+          id
+          name
+          object {
+            ... on Drug {
+              name
+              maximumClinicalStage
+              drugType
+              description
+              mechanismsOfAction {
+                rows {
+                  mechanismOfAction
+                  targets { approvedSymbol }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    """
+    drugs      = []
+    seen_drugs = set()
+
+    for target in protein_targets[:3]:
+        gene_symbol = target.get("gene_symbol", "")
+        if not gene_symbol:
+            continue
+
+        search_term = f"{gene_symbol} {disease_name}"
+        print(f"  → Protein drug search: {search_term}")
+
+        try:
+            response = requests.post(
+                OPENTARGETS_API,
+                json={"query": query, "variables": {"term": search_term, "size": max_drugs}},
+                headers={"Content-Type": "application/json"},
+                timeout=30
+            )
+            response.raise_for_status()
+            data = response.json()
+            hits = data.get("data", {}).get("search", {}).get("hits", [])
+
+            for hit in hits:
+                obj       = hit.get("object", {})
+                drug_name = obj.get("name", "")
+                if not drug_name or drug_name.upper() in seen_drugs:
+                    continue
+                seen_drugs.add(drug_name.upper())
+
+                mechanism   = "Unknown mechanism"
+                target_gene = gene_symbol
+                moa_rows    = obj.get("mechanismsOfAction", {}).get("rows", [])
+                if moa_rows:
+                    mechanism = moa_rows[0].get("mechanismOfAction", "Unknown mechanism")
+                    targets   = moa_rows[0].get("targets", [])
+                    if targets:
+                        target_gene = targets[0].get("approvedSymbol", gene_symbol)
+
+                phase = parse_clinical_stage(obj.get("maximumClinicalStage", ""))
+
+                drugs.append({
+                    "drug_name":      drug_name.title(),
+                    "drug_id":        hit.get("id", ""),
+                    "drug_type":      obj.get("drugType", "Unknown"),
+                    "clinical_phase": phase,
+                    "mechanism":      mechanism,
+                    "description":    obj.get("description", "")[:200],
+                    "target_gene":    target_gene,
+                    "status":         obj.get("maximumClinicalStage", ""),
+                })
+
+        except Exception as e:
+            print(f"  Protein drug search error ({gene_symbol}): {e}")
+            continue
+
+    print(f"  Protein-level drug search: {len(drugs)} drugs found")
+    return drugs
 
 
 def fetch_fda_adverse_events(drug_name: str, max_results: int = 5) -> list:
-    """
-    Fetch top adverse event reactions from FDA FAERS for a drug.
-    Returns sorted list of {reaction, count} dicts.
-    """
+    """Fetch top adverse event reactions from FDA FAERS."""
     params = {
         "search": f'patient.drug.medicinalproduct:"{drug_name}"',
         "count":  "patient.reaction.reactionmeddrapt.exact",
         "limit":  max_results
     }
-
     try:
         response = requests.get(FDA_FAERS_API, params=params, timeout=30)
         if response.status_code == 404:
             return []
         response.raise_for_status()
         data = response.json()
-
         return [
-            {"reaction": item.get("term", "Unknown"),
-             "count":    item.get("count", 0)}
+            {"reaction": item.get("term", "Unknown"), "count": item.get("count", 0)}
             for item in data.get("results", [])
         ]
-
-    except requests.exceptions.RequestException as e:
+    except Exception as e:
         print(f"  FDA FAERS error for {drug_name}: {e}")
         return []
 
 
 def fetch_drug_data_for_disease(
     protein_targets:       list,
-    max_drugs_per_protein: int = 3
+    max_drugs_per_protein: int = 3,
+    disease_id:            str = "",
+    disease_name:          str = ""
 ) -> dict:
     """
-    Master function: fetch drugs + FDA signals + risk classification
-    for the top 3 protein targets.
-
-    Returns structured drug data with risk intelligence fields.
+    Master function: fetch real drugs + FDA signals + risk + competition.
+    Strategy:
+    1. Search by disease name (primary — most comprehensive)
+    2. Fall back to protein-level search if nothing found
+    3. Enrich each drug with FDA + risk + competition data
     """
-    all_drug_data = []
+    all_drug_data   = []
+    seen_drug_names = set()
 
-    for target in protein_targets[:3]:
-        gene_symbol = target.get("gene_symbol", "")
-        ensembl_id  = target.get("ensembl_id", "")
-        if not ensembl_id:
-            continue
+    # ── Step 1: Disease-level search ──────────────────────────
+    if disease_name:
+        print(f"\n  🔍 Searching drugs for: {disease_name}")
+        disease_drugs = fetch_drugs_by_disease_name(disease_name, max_drugs=10)
 
-        print(f"  → Fetching drugs for: {gene_symbol} ({ensembl_id})")
-        drugs = fetch_drugs_for_protein(ensembl_id, gene_symbol, max_drugs_per_protein)
-
-        for drug in drugs:
+        for drug in disease_drugs:
             drug_name = drug["drug_name"]
+            if drug_name.upper() in seen_drug_names:
+                continue
+            seen_drug_names.add(drug_name.upper())
+
             print(f"     → FDA signals for: {drug_name}")
-
-            # Get adverse events
-            fda_events = fetch_fda_adverse_events(drug_name, max_results=5)
-
-            # ── Classify Risk ─────────────────────────────────
+            fda_events   = fetch_fda_adverse_events(drug_name)
             risk_level, risk_description, risk_color = classify_fda_risk(fda_events)
-
-            # ── Competition Intelligence ──────────────────────
-            comp_intel = classify_competition(
+            comp_intel   = classify_competition(
                 drug_name = drug_name,
-                mechanism = drug.get("mechanism",""),
-                drug_type = drug.get("drug_type","")
-            )
-
-            print(
-                f"        Competition: {comp_intel.competition_level} "
-                f"({comp_intel.num_similar_drugs} similar drugs)"
+                mechanism = drug.get("mechanism", ""),
+                drug_type = drug.get("drug_type", "")
             )
 
             all_drug_data.append({
                 **drug,
-                "fda_adverse_events": fda_events,
-                "risk_level":         risk_level,
-                "risk_description":   risk_description,
-                "risk_color":         risk_color,
-                # V4 Feature 4
-                "competition_level":    comp_intel.competition_level,
-                "competition_color":    comp_intel.competition_color,
-                "num_similar_drugs":    comp_intel.num_similar_drugs,
-                "similar_drug_names":   comp_intel.similar_drug_names,
-                "market_opportunity":   comp_intel.market_opportunity,
-                "strategic_note":       comp_intel.strategic_note,
-                "drug_class":           comp_intel.drug_class
+                "fda_adverse_events":  fda_events,
+                "risk_level":          risk_level,
+                "risk_description":    risk_description,
+                "risk_color":          risk_color,
+                "competition_level":   comp_intel.competition_level,
+                "competition_color":   comp_intel.competition_color,
+                "num_similar_drugs":   comp_intel.num_similar_drugs,
+                "similar_drug_names":  comp_intel.similar_drug_names,
+                "market_opportunity":  comp_intel.market_opportunity,
+                "strategic_note":      comp_intel.strategic_note,
+                "drug_class":          comp_intel.drug_class
             })
+            print(f"        Phase: {drug['clinical_phase']} | Risk: {risk_level}")
 
-            print(
-                f"        Risk: {risk_level} "
-                f"({'top AE: ' + str(fda_events[0]['count']) + ' reports' if fda_events else 'no data'})"
+    # ── Step 2: Protein-level fallback ─────────────────────────
+    if not all_drug_data and protein_targets:
+        print(f"  ⚠️  No disease drugs found — trying protein-level search")
+        protein_drugs = fetch_drugs_for_protein_targets(
+            protein_targets, disease_name, max_drugs_per_protein
+        )
+
+        for drug in protein_drugs:
+            drug_name = drug["drug_name"]
+            if drug_name.upper() in seen_drug_names:
+                continue
+            seen_drug_names.add(drug_name.upper())
+
+            print(f"     → FDA signals for: {drug_name}")
+            fda_events   = fetch_fda_adverse_events(drug_name)
+            risk_level, risk_description, risk_color = classify_fda_risk(fda_events)
+            comp_intel   = classify_competition(
+                drug_name = drug_name,
+                mechanism = drug.get("mechanism", ""),
+                drug_type = drug.get("drug_type", "")
             )
 
+            all_drug_data.append({
+                **drug,
+                "fda_adverse_events":  fda_events,
+                "risk_level":          risk_level,
+                "risk_description":    risk_description,
+                "risk_color":          risk_color,
+                "competition_level":   comp_intel.competition_level,
+                "competition_color":   comp_intel.competition_color,
+                "num_similar_drugs":   comp_intel.num_similar_drugs,
+                "similar_drug_names":  comp_intel.similar_drug_names,
+                "market_opportunity":  comp_intel.market_opportunity,
+                "strategic_note":      comp_intel.strategic_note,
+                "drug_class":          comp_intel.drug_class
+            })
+
+    print(f"\n  ✅ Total drugs fetched: {len(all_drug_data)}")
     return {
         "total_drugs": len(all_drug_data),
         "drug_data":   all_drug_data
@@ -448,28 +485,26 @@ def fetch_drug_data_for_disease(
 
 # ── Quick test ────────────────────────────────────────────────
 if __name__ == "__main__":
-    print("Testing Drug Service V2 — Risk Intelligence Layer")
+    print("Testing Drug Service V4 — Real Data")
     print("=" * 55)
 
-    test_targets = [
-        {"gene_symbol": "PSEN1", "ensembl_id": "ENSG00000080815"},
-        {"gene_symbol": "APP",   "ensembl_id": "ENSG00000142192"},
-        {"gene_symbol": "APOE",  "ensembl_id": "ENSG00000130203"},
+    test_cases = [
+        {"disease_name": "Alkaptonuria",     "disease_id": "MONDO_0008753"},
+        {"disease_name": "Alzheimer disease","disease_id": "MONDO_0004975"},
+        {"disease_name": "Parkinson disease","disease_id": "MONDO_0005180"},
+        {"disease_name": "type 2 diabetes",  "disease_id": "MONDO_0005148"},
     ]
 
-    result = fetch_drug_data_for_disease(test_targets, max_drugs_per_protein=3)
-
-    print(f"\nTotal drugs: {result['total_drugs']}")
-    print("\nDrug Risk Intelligence:")
-    print("-" * 55)
-
-    for drug in result["drug_data"]:
-        risk  = drug["risk_level"]
-        emoji = {"High": "🔴", "Medium": "🟡", "Low": "🟢"}.get(risk, "⚪")
-        print(f"\n💊 {drug['drug_name']} → {drug['target_gene']}")
-        print(f"   Phase  : {drug['clinical_phase']}")
-        print(f"   Risk   : {emoji} {risk}")
-        print(f"   Reason : {drug['risk_description'][:80]}...")
-        if drug["fda_adverse_events"]:
-            top = drug["fda_adverse_events"][0]
-            print(f"   Top AE : {top['reaction']} ({top['count']:,} reports)")
+    for case in test_cases:
+        print(f"\n{'='*55}")
+        print(f"Disease: {case['disease_name']}")
+        result = fetch_drug_data_for_disease(
+            protein_targets = [],
+            disease_name    = case["disease_name"],
+            disease_id      = case["disease_id"]
+        )
+        print(f"Total drugs: {result['total_drugs']}")
+        for drug in result["drug_data"]:
+            print(f"  💊 {drug['drug_name']} | Phase {drug['clinical_phase']} | "
+                  f"Risk: {drug['risk_level']} | Target: {drug['target_gene']} | "
+                  f"Mechanism: {drug['mechanism'][:50]}")
