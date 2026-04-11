@@ -12,18 +12,6 @@ ALPHAFOLD_API   = "https://alphafold.ebi.ac.uk/api/prediction"
 # ── AlphaFold pLDDT score lookup ──────────────────────────────
 # Known high-confidence AlphaFold scores for common AD proteins
 # Used as fallback when API is unavailable
-ALPHAFOLD_MOCK_SCORES = {
-    "PSEN1": {"plddt": 0.87, "label": "High",   "color": "#22c55e"},
-    "PSEN2": {"plddt": 0.84, "label": "High",   "color": "#22c55e"},
-    "APP":   {"plddt": 0.79, "label": "Good",   "color": "#84cc16"},
-    "APOE":  {"plddt": 0.82, "label": "High",   "color": "#22c55e"},
-    "GRIN1": {"plddt": 0.91, "label": "V.High", "color": "#22c55e"},
-    "BACE1": {"plddt": 0.88, "label": "High",   "color": "#22c55e"},
-    "MAPT":  {"plddt": 0.61, "label": "Medium", "color": "#f59e0b"},
-    "EGFR":  {"plddt": 0.94, "label": "V.High", "color": "#22c55e"},
-    "BRCA1": {"plddt": 0.72, "label": "Good",   "color": "#84cc16"},
-    "TP53":  {"plddt": 0.68, "label": "Medium", "color": "#f59e0b"},
-}
 
 
 def get_alphafold_score(gene_symbol: str, uniprot_id: str = "") -> dict:
@@ -50,7 +38,7 @@ def get_alphafold_score(gene_symbol: str, uniprot_id: str = "") -> dict:
                 if data and len(data) > 0:
                     # Get mean pLDDT from the prediction metadata
                     entry     = data[0]
-                    plddt_raw = entry.get("meanPlddt", 0)
+                    plddt_raw = entry.get("globalMetricValue", 0)
 
                     # Normalize to 0.0-1.0
                     plddt = round(plddt_raw / 100.0, 3)
@@ -74,17 +62,12 @@ def get_alphafold_score(gene_symbol: str, uniprot_id: str = "") -> dict:
             pass  # Fall through to mock
 
     # Use curated mock scores
-    mock = ALPHAFOLD_MOCK_SCORES.get(gene_symbol.upper())
-    if mock:
-        return {**mock, "source": "curated"}
-
-    # Default for unknown proteins
     return {
-        "plddt":  0.70,
-        "label":  "Est.",
-        "color":  "#64748b",
-        "source": "estimated"
-    }
+    "plddt":  0.65,
+    "label":  "N/A",
+    "color":  "#94a3b8",
+    "source": "not available"
+}
 
 
 def search_disease_id(disease_name: str) -> dict:
@@ -132,22 +115,26 @@ def fetch_protein_targets(disease_name: str, max_targets: int = 10) -> dict:
 
     query = """
     query DiseaseTargets($diseaseId: String!, $size: Int!) {
-      disease(efoId: $diseaseId) {
+    disease(efoId: $diseaseId) {
         id
         name
         associatedTargets(page: {index: 0, size: $size}) {
-          rows {
+        rows {
             target {
-              id
-              approvedSymbol
-              approvedName
-              biotype
-              functionDescriptions
+            id
+            approvedSymbol
+            approvedName
+            biotype
+            functionDescriptions
+            proteinIds {
+                id
+                source
+            }
             }
             score
-          }
         }
-      }
+        }
+    }
     }
     """
 
@@ -179,8 +166,20 @@ def fetch_protein_targets(disease_name: str, max_targets: int = 10) -> dict:
             descs      = target.get("functionDescriptions", [])
             description= descs[0] if descs else "No description available"
 
-            # ── Feature 6: Get AlphaFold score ───────────────
-            af_score = get_alphafold_score(gene_sym)
+            # Get UniProt SwissProt ID (most reliable for AlphaFold)
+            protein_ids = target.get("proteinIds", []) or []
+            uniprot_id  = next(
+                (p["id"] for p in protein_ids if p.get("source") == "uniprot_swissprot"),
+                ""
+            )
+
+            # ── Feature 6: Get AlphaFold score (real API) ────
+            af_score = get_alphafold_score(gene_sym, uniprot_id)
+            print(f"     AlphaFold {gene_sym}: pLDDT={af_score['plddt']:.2f} "
+                f"({af_score['label']}) [{af_score['source']}]")
+
+            # ── Feature 6: Get AlphaFold score (real API) ────
+            af_score = get_alphafold_score(gene_sym, uniprot_id)
 
             targets.append({
                 "gene_symbol":         gene_sym,
