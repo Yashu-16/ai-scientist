@@ -8,7 +8,7 @@ import { CookieBanner } from "@/components/legal/CookieBanner"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "AI Scientist — Drug Discovery Platform",
+  title: "Causyn AI — Drug Discovery Platform",
   description: "V5 Decision & Risk Intelligence Platform for Drug Discovery",
 }
 

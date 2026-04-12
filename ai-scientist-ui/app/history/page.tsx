@@ -51,7 +51,7 @@ export default function HistoryPage() {
     setLoading(true)
     const params = new URLSearchParams({
       page:  String(page),
-      limit: "15",
+      limit: "50",
     })
     if (search)   params.set("search",   search)
     if (decision) params.set("decision", decision)
@@ -260,7 +260,7 @@ export default function HistoryPage() {
                     {/* Date */}
                     <div className="col-span-1">
                       <p className="text-xs text-gray-400">
-                        {new Date(a.createdAt).toLocaleDateString("en-IN", {
+                        {new Date(a.createdAt).toLocaleDateString("en-US", {
                           day: "numeric", month: "short"
                         })}
                       </p>
@@ -298,7 +298,7 @@ export default function HistoryPage() {
       {pages > 1 && (
         <div className="flex items-center justify-between">
           <p className="text-sm text-gray-500">
-            Showing {((page-1)*15)+1}–{Math.min(page*15, total)} of {total}
+          Showing {((page-1)*50)+1}–{Math.min(page*50, total)} of {total}
           </p>
           <div className="flex items-center gap-2">
             <button

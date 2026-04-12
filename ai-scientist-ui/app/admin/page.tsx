@@ -47,7 +47,7 @@ export default function AdminOverview() {
         <div>
           <h1 className="text-xl font-bold text-white">Overview</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            {new Date().toLocaleDateString("en-IN", {
+            {new Date().toLocaleDateString("en-US", {
               weekday:"long", day:"numeric", month:"long", year:"numeric"
             })}
           </p>
@@ -90,7 +90,7 @@ export default function AdminOverview() {
           },
           {
             label:  "MRR",
-            value:  `₹${(data.revenue.mrr).toLocaleString("en-IN")}`,
+            value:  `$${(data.revenue.mrr / 100).toFixed(2)}`,
             sub:    data.revenue.growth >= 0
               ? `+${data.revenue.growth}% vs last month`
               : `${data.revenue.growth}% vs last month`,
@@ -165,9 +165,9 @@ export default function AdminOverview() {
           </h3>
           <div className="space-y-3">
             {[
-              { label:"This Month",  value:`₹${data.revenue.mrr.toLocaleString("en-IN")}`,       color:"text-emerald-400" },
-              { label:"Last Month",  value:`₹${data.revenue.lastMonth.toLocaleString("en-IN")}`,  color:"text-gray-300"   },
-              { label:"Total Revenue", value:`₹${data.revenue.total.toLocaleString("en-IN")}`,   color:"text-white"      },
+              { label:"This Month",  value:`$${(data.revenue.mrr / 100).toFixed(2)}`,       color:"text-emerald-400" },
+              { label:"Last Month",  value:`$${(data.revenue.lastMonth / 100).toFixed(2)}`,  color:"text-gray-300"   },
+              { label:"Total Revenue", value:`$${(data.revenue.total / 100).toFixed(2)}`,   color:"text-white"      },
               { label:"MoM Growth",  value:`${data.revenue.growth >= 0 ? "+" : ""}${data.revenue.growth}%`, color: data.revenue.growth >= 0 ? "text-emerald-400" : "text-red-400" },
             ].map(({ label, value, color }) => (
               <div key={label} className="flex items-center justify-between py-2 border-b border-gray-800 last:border-0">

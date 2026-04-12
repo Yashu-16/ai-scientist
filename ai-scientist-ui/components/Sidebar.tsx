@@ -31,7 +31,7 @@ export function Sidebar() {
           <Dna className="h-4 w-4 text-white" />
         </div>
         <div>
-          <p className="text-sm font-bold text-gray-900 leading-none">AI Scientist</p>
+          <p className="text-sm font-bold text-gray-900 leading-none">Causyn AI</p>
           <p className="text-[11px] text-gray-400 mt-0.5">Drug Discovery V5</p>
         </div>
       </div>

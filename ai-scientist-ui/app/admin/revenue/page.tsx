@@ -26,7 +26,7 @@ export default function AdminRevenue() {
       {/* Monthly breakdown */}
       {data?.monthly && Object.keys(data.monthly).length > 0 && (
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-          <h3 className="text-sm font-semibold text-white mb-4">Monthly Revenue (INR)</h3>
+          <h3 className="text-sm font-semibold text-white mb-4">Monthly Revenue (USD)</h3>
           <div className="space-y-3">
             {Object.entries(data.monthly)
               .sort((a, b) => b[0].localeCompare(a[0]))
@@ -41,7 +41,7 @@ export default function AdminRevenue() {
                         style={{ width: `${pct}%` }} />
                     </div>
                     <p className="text-xs font-semibold text-emerald-400 w-24 text-right">
-                      ₹{(amount as number).toLocaleString("en-IN")}
+                      ${((amount as number) / 100).toFixed(2)}
                     </p>
                   </div>
                 )
@@ -74,15 +74,15 @@ export default function AdminRevenue() {
                   </p>
                   <p className="text-xs text-gray-500">
                     {getPlan(p.plan as PlanId).name} Plan ·{" "}
-                    {new Date(p.createdAt).toLocaleDateString("en-IN", {
-                      day:"numeric", month:"short", year:"numeric"
+                    {new Date(p.createdAt).toLocaleDateString("en-US", {
+                      day: "numeric", month: "short", year: "numeric"
                     })}
                   </p>
                 </div>
               </div>
               <div className="text-right flex-shrink-0">
                 <p className="text-sm font-bold text-emerald-400">
-                  ₹{(p.amount / 100).toLocaleString("en-IN")}
+                  ${(p.amount / 100).toFixed(2)}
                 </p>
                 <span className="text-[10px] bg-emerald-900/30 text-emerald-400 px-2 py-0.5 rounded-full">
                   Captured

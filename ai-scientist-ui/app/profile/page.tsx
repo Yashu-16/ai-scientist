@@ -55,7 +55,7 @@ export default function ProfilePage() {
     Math.round((userData.analysesUsed / (userData.analysesLimit === 999999 ? 999999 : userData.analysesLimit)) * 100),
     100
   )
-  const memberSince = new Date(userData.createdAt).toLocaleDateString("en-IN", {
+  const memberSince = new Date(userData.createdAt).toLocaleDateString("en-US", {
     month: "long", year: "numeric"
   })
 
@@ -421,7 +421,7 @@ function PlanTab({ user, plan, usagePct }: { user: any; plan: any; usagePct: num
           <div>
             <p className="text-2xl font-black text-gray-900">{plan.name}</p>
             <p className="text-sm text-gray-500 mt-0.5">
-              {plan.price === 0 ? "Free forever" : `₹${plan.price.toLocaleString("en-IN")}/month`}
+              {plan.price === 0 ? "Free forever" : `$${plan.price}/month`}
             </p>
           </div>
           {plan.id !== "PRO" && plan.id !== "ENTERPRISE" && (

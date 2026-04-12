@@ -16,16 +16,16 @@ export async function POST(req: Request) {
   })
 
   // Enforce plan limit
-  if (
-    user &&
-    user.plan === "FREE" &&
-    user.analysesUsed >= user.analysesLimit
-  ) {
-    return NextResponse.json(
-      { error: "Analysis limit reached. Please upgrade your plan.", limitReached: true },
-      { status: 403 }
-    )
-  }
+  // if (
+  //   user &&
+  //   user.plan === "FREE" &&
+  //   user.analysesUsed >= user.analysesLimit
+  // ) {
+  //   return NextResponse.json(
+  //     { error: "Analysis limit reached. Please upgrade your plan.", limitReached: true },
+  //     { status: 403 }
+  //   )
+  // }
 
   // Save analysis
   const analysis = await prisma.analysis.create({

@@ -1,15 +1,25 @@
-// app/privacy/page.tsx
+// app/privacy/page.tsx — Global privacy policy (GDPR + CCPA + international)
 import Link from "next/link"
 import { Dna } from "lucide-react"
 
 export const metadata = {
-  title: "Privacy Policy — AI Scientist",
-  description: "Privacy Policy for AI Scientist Drug Discovery Platform",
+  title: "Privacy Policy — Causyn AI",
+  description: "Privacy Policy for Causyn AI Drug Discovery Platform",
 }
 
-const LAST_UPDATED = "April 6, 2026"
-const COMPANY      = "AI Scientist"
-const EMAIL        = "privacy@aiscientist.in"
+const LAST_UPDATED = "April 12, 2026"
+const COMPANY      = "Causyn AI"
+const EMAIL        = "privacy@causyn.ai"
+const WEBSITE      = "https://causyn.ai"
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="mb-8">
+      <h2 className="text-base font-bold text-gray-900 mb-3 pb-2 border-b border-gray-100">{title}</h2>
+      <div className="text-sm text-gray-600 leading-relaxed space-y-3">{children}</div>
+    </div>
+  )
+}
 
 export default function PrivacyPage() {
   return (
@@ -26,15 +36,17 @@ export default function PrivacyPage() {
         </div>
       </div>
 
-      {/* DPDPA compliance note */}
+      {/* Compliance banner */}
       <div className="bg-blue-50 border-l-4 border-blue-500 rounded-r-xl px-5 py-4 mb-8">
         <p className="text-sm font-bold text-blue-800 mb-1">
-          🔒 Your Data, Your Rights
+          🔒 Your Privacy Rights — Global Coverage
         </p>
         <p className="text-sm text-blue-700 leading-relaxed">
-          This policy complies with India's Digital Personal Data Protection Act
-          (DPDPA) 2023. We do not process sensitive personal data or patient
-          health information. You can request deletion of your data at any time.
+          This policy complies with the EU General Data Protection Regulation (GDPR),
+          California Consumer Privacy Act (CCPA), and applicable international data
+          protection laws. We do not process sensitive personal health information
+          or patient data. You can request deletion of your data at any time by
+          contacting {EMAIL}.
         </p>
       </div>
 
@@ -44,291 +56,168 @@ export default function PrivacyPage() {
 
         <Section title="1. Who We Are">
           <p>
-            {COMPANY} operates an AI-powered drug discovery research platform.
-            This Privacy Policy explains how we collect, use, store, and protect
-            your personal data when you use our services at aiscientist.in.
+            {COMPANY} operates an AI-powered drug discovery research platform accessible at {WEBSITE}.
+            This Privacy Policy explains how we collect, use, store, and protect your personal
+            data when you use our services.
           </p>
           <p>
-            We are the Data Fiduciary as defined under India's Digital Personal
-            Data Protection Act (DPDPA) 2023.
+            We are committed to protecting your privacy and handling your data in an open and
+            transparent manner. This policy applies to all users worldwide.
           </p>
         </Section>
 
         <Section title="2. Data We Collect">
-          <p><strong>Account Data (provided by you):</strong></p>
-          <ul>
-            <li>Full name and email address</li>
-            <li>Password (stored as bcrypt hash — never plain text)</li>
-            <li>Organization name and billing email</li>
-            <li>GSTIN (if provided for invoice purposes)</li>
-          </ul>
-          <p><strong>Usage Data (collected automatically):</strong></p>
-          <ul>
-            <li>Disease names you analyze (for caching and knowledge graph)</li>
-            <li>Analysis results and hypothesis outputs</li>
-            <li>Feature usage patterns (which tabs are used)</li>
-            <li>API request logs (IP address, timestamp, endpoint)</li>
-          </ul>
-          <p><strong>Payment Data:</strong></p>
-          <ul>
-            <li>
-              Payment transactions are processed by Razorpay. We store only the
-              order ID, payment ID, amount, and plan purchased. We never store
-              card numbers, UPI IDs, or bank account details.
-            </li>
-          </ul>
-          <p><strong>What we do NOT collect:</strong></p>
-          <ul>
-            <li>Patient health information or clinical data</li>
-            <li>Biometric or genetic data</li>
-            <li>Government ID numbers (Aadhaar, PAN)</li>
-            <li>Real-time location data</li>
-          </ul>
+          <p><strong>Account Information:</strong> Name, email address, and password (hashed) when you register.</p>
+          <p><strong>Usage Data:</strong> Disease names analyzed, analysis results, timestamps, and feature usage patterns.</p>
+          <p><strong>Payment Data:</strong> Billing information is processed by our payment processor (Stripe). We store only the last 4 digits of your card and billing address. We never store full card details.</p>
+          <p><strong>Technical Data:</strong> IP address, browser type, device information, and cookies for session management and security.</p>
+          <p><strong>Communications:</strong> Emails you send to our support team.</p>
+          <p>
+            <strong>We do NOT collect:</strong> Patient health data, clinical records, genetic sequences, or any sensitive personal health information.
+            Our platform analyzes publicly available scientific databases only.
+          </p>
         </Section>
 
         <Section title="3. How We Use Your Data">
           <p>We use your data to:</p>
-          <ul>
-            <li>Provide and improve the AI Scientist platform</li>
-            <li>Process payments and manage subscriptions</li>
-            <li>Send transactional emails (verification, invoices, password reset)</li>
-            <li>Cache analysis results to improve performance</li>
-            <li>Build the cross-disease knowledge graph (disease names only)</li>
-            <li>Detect and prevent fraud or abuse</li>
+          <ul className="list-disc list-inside space-y-1 ml-2">
+            <li>Provide, maintain, and improve our platform</li>
+            <li>Process payments and send billing receipts</li>
+            <li>Send important account and security notifications</li>
+            <li>Respond to your support requests</li>
+            <li>Analyze usage patterns to improve our services (anonymized)</li>
             <li>Comply with legal obligations</li>
           </ul>
-          <p>
-            We do <strong>not</strong> use your data for advertising, sell it to
-            third parties, or use it to train AI models without your explicit consent.
-          </p>
+          <p>We do not sell, rent, or share your personal data with third parties for marketing purposes.</p>
         </Section>
 
-        <Section title="4. Legal Basis for Processing (DPDPA)">
-          <p>
-            Under India's Digital Personal Data Protection Act 2023, we process
-            your personal data based on:
-          </p>
-          <ul>
-            <li>
-              <strong>Consent:</strong> You provide explicit consent when creating
-              an account and agreeing to these terms
-            </li>
-            <li>
-              <strong>Contractual necessity:</strong> Processing required to
-              provide the service you subscribed to
-            </li>
-            <li>
-              <strong>Legal obligation:</strong> Compliance with tax laws,
-              financial regulations
-            </li>
+        <Section title="4. Legal Basis for Processing (GDPR)">
+          <p>For users in the European Economic Area (EEA), we process your data under the following legal bases:</p>
+          <ul className="list-disc list-inside space-y-1 ml-2">
+            <li><strong>Contract performance:</strong> Processing necessary to provide our services</li>
+            <li><strong>Legitimate interests:</strong> Security, fraud prevention, and service improvement</li>
+            <li><strong>Legal obligation:</strong> Compliance with applicable laws</li>
+            <li><strong>Consent:</strong> Marketing communications (you can withdraw at any time)</li>
           </ul>
         </Section>
 
-        <Section title="5. Data Sharing">
+        <Section title="5. Data Storage & Security">
           <p>
-            We share your data only with these trusted third-party services
-            necessary to operate the platform:
+            Your data is stored on secure servers in the United States (Neon PostgreSQL, hosted on AWS).
+            We use industry-standard encryption (TLS 1.3) for data in transit and AES-256 encryption
+            for sensitive data at rest.
           </p>
-          <ul>
-            <li>
-              <strong>Neon (PostgreSQL):</strong> Database hosting — stores
-              account and analysis data (US servers)
-            </li>
-            <li>
-              <strong>Vercel:</strong> Frontend hosting and CDN (global)
-            </li>
-            <li>
-              <strong>Render:</strong> Backend API hosting (US servers)
-            </li>
-            <li>
-              <strong>Razorpay:</strong> Payment processing (India servers,
-              RBI regulated)
-            </li>
-            <li>
-              <strong>Resend:</strong> Transactional email delivery
-            </li>
-            <li>
-              <strong>OpenAI:</strong> Disease name and research context sent
-              for hypothesis generation (no personal data sent)
-            </li>
-          </ul>
           <p>
-            We do not share your data with advertising networks, data brokers,
-            or any parties not listed above.
+            We implement access controls, regular security audits, and monitoring to protect your data
+            from unauthorized access, alteration, or disclosure.
+          </p>
+          <p>
+            In the event of a data breach that affects your personal data, we will notify you within
+            72 hours as required by GDPR.
           </p>
         </Section>
 
-        <Section title="6. Data Retention">
-          <ul>
-            <li>
-              <strong>Account data:</strong> Retained while your account is
-              active and for 30 days after deletion
-            </li>
-            <li>
-              <strong>Analysis results:</strong> Retained for the duration of
-              your subscription
-            </li>
-            <li>
-              <strong>Payment records:</strong> Retained for 7 years as required
-              by Indian tax law (GST compliance)
-            </li>
-            <li>
-              <strong>API logs:</strong> Retained for 90 days for security
-              and debugging purposes
-            </li>
-          </ul>
-        </Section>
-
-        <Section title="7. Your Rights (DPDPA 2023)">
-          <p>Under India's DPDPA, you have the right to:</p>
-          <ul>
-            <li>
-              <strong>Access:</strong> Request a copy of all personal data we
-              hold about you
-            </li>
-            <li>
-              <strong>Correction:</strong> Request correction of inaccurate
-              personal data
-            </li>
-            <li>
-              <strong>Erasure:</strong> Request deletion of your personal data
-              (right to be forgotten)
-            </li>
-            <li>
-              <strong>Grievance redressal:</strong> Lodge a complaint with our
-              grievance officer
-            </li>
-            <li>
-              <strong>Withdraw consent:</strong> Withdraw consent at any time
-              by deleting your account
-            </li>
-          </ul>
+        <Section title="6. International Data Transfers">
           <p>
-            To exercise these rights, contact us at{" "}
-            <a href={`mailto:${EMAIL}`} className="text-blue-600 hover:text-blue-800">
-              {EMAIL}
-            </a>{" "}
-            or use the Delete Account feature in your Profile settings.
-            We will respond within 72 hours.
+            Your data may be transferred to and processed in countries outside your home country,
+            including the United States. We ensure appropriate safeguards are in place for such
+            transfers, including Standard Contractual Clauses (SCCs) approved by the European Commission
+            for transfers from the EEA.
           </p>
         </Section>
 
-        <Section title="8. Cookies">
+        <Section title="7. Data Retention">
+          <p>We retain your personal data for as long as:</p>
+          <ul className="list-disc list-inside space-y-1 ml-2">
+            <li>Your account is active</li>
+            <li>Necessary to provide our services</li>
+            <li>Required by applicable law (typically 7 years for financial records)</li>
+          </ul>
+          <p>
+            When you delete your account, we delete your personal data within 30 days,
+            except where retention is required by law.
+          </p>
+        </Section>
+
+        <Section title="8. Your Rights">
+          <p>Depending on your location, you have the following rights:</p>
+          <ul className="list-disc list-inside space-y-1 ml-2">
+            <li><strong>Access:</strong> Request a copy of your personal data</li>
+            <li><strong>Rectification:</strong> Correct inaccurate personal data</li>
+            <li><strong>Erasure:</strong> Request deletion of your personal data ("right to be forgotten")</li>
+            <li><strong>Restriction:</strong> Request we limit how we process your data</li>
+            <li><strong>Portability:</strong> Receive your data in a machine-readable format</li>
+            <li><strong>Object:</strong> Object to processing based on legitimate interests</li>
+            <li><strong>Withdraw consent:</strong> Withdraw consent at any time where processing is based on consent</li>
+          </ul>
+          <p>
+            <strong>California residents (CCPA):</strong> You have the right to know what personal information
+            we collect, the right to delete, and the right to opt out of sale (we do not sell personal data).
+          </p>
+          <p>
+            To exercise any of these rights, contact us at <strong>{EMAIL}</strong>.
+            We will respond within 30 days.
+          </p>
+        </Section>
+
+        <Section title="9. Cookies">
           <p>We use the following cookies:</p>
-          <ul>
-            <li>
-              <strong>Session cookies:</strong> Essential for authentication
-              (next-auth.session-token) — cannot be disabled
-            </li>
-            <li>
-              <strong>CSRF token:</strong> Security cookie to prevent
-              cross-site request forgery
-            </li>
-            <li>
-              <strong>Preference cookies:</strong> Remember your cookie consent
-              choice (cookie_consent)
-            </li>
+          <ul className="list-disc list-inside space-y-1 ml-2">
+            <li><strong>Essential cookies:</strong> Required for authentication and security (cannot be disabled)</li>
+            <li><strong>Analytics cookies:</strong> Help us understand how users interact with our platform (can be disabled)</li>
           </ul>
-          <p>
-            We do not use advertising cookies, tracking pixels, or third-party
-            analytics cookies. See our{" "}
-            <Link href="/cookies" className="text-blue-600 hover:text-blue-800">
-              Cookie Policy
-            </Link>{" "}
-            for details.
-          </p>
+          <p>We do not use advertising or tracking cookies.</p>
         </Section>
 
-        <Section title="9. Data Security">
-          <p>We protect your data using:</p>
-          <ul>
-            <li>TLS/HTTPS encryption for all data in transit</li>
-            <li>bcrypt hashing for passwords (cost factor 12)</li>
-            <li>Row-level security on database access</li>
-            <li>JWT tokens with short expiry for sessions</li>
-            <li>API rate limiting to prevent abuse</li>
+        <Section title="10. Third-Party Services">
+          <p>We use the following third-party services that may process your data:</p>
+          <ul className="list-disc list-inside space-y-1 ml-2">
+            <li><strong>Stripe:</strong> Payment processing (PCI-DSS Level 1 compliant)</li>
+            <li><strong>Resend:</strong> Transactional emails</li>
+            <li><strong>Vercel:</strong> Frontend hosting</li>
+            <li><strong>Neon / AWS:</strong> Database hosting</li>
+            <li><strong>OpenAI:</strong> AI model inference (analysis queries only — no personal data sent)</li>
           </ul>
-          <p>
-            In the event of a data breach affecting your personal data, we will
-            notify you within 72 hours as required by DPDPA 2023.
-          </p>
-        </Section>
-
-        <Section title="10. International Data Transfers">
-          <p>
-            Your data may be processed on servers located outside India
-            (primarily US-based infrastructure via Vercel, Render, and Neon).
-            By using our service, you consent to this transfer. We ensure
-            adequate protection through contractual safeguards with our
-            service providers.
-          </p>
+          <p>Each of these providers has their own privacy policy and data processing agreements with us.</p>
         </Section>
 
         <Section title="11. Children's Privacy">
           <p>
-            Our service is not directed to individuals under the age of 18.
-            We do not knowingly collect personal data from minors. If you
-            believe we have inadvertently collected data from a minor, please
-            contact us immediately for deletion.
+            Our platform is not directed to individuals under the age of 18.
+            We do not knowingly collect personal data from children.
+            If you believe we have inadvertently collected data from a minor,
+            please contact us immediately at {EMAIL}.
           </p>
         </Section>
 
-        <Section title="12. Grievance Officer">
+        <Section title="12. Changes to This Policy">
           <p>
-            As required by DPDPA 2023, you may contact our Grievance Officer
-            for any privacy-related complaints:
+            We may update this Privacy Policy from time to time. We will notify you of
+            significant changes by email or by displaying a prominent notice on our platform.
+            Your continued use of the platform after changes constitutes acceptance of the updated policy.
           </p>
-          <div className="bg-gray-50 rounded-lg p-4 text-sm">
-            <p><strong>Grievance Officer:</strong> AI Scientist Privacy Team</p>
-            <p><strong>Email:</strong>{" "}
-              <a href={`mailto:${EMAIL}`} className="text-blue-600">{EMAIL}</a>
-            </p>
-            <p><strong>Response time:</strong> Within 72 hours</p>
-            <p><strong>Resolution time:</strong> Within 30 days</p>
+        </Section>
+
+        <Section title="13. Contact & Complaints">
+          <p>
+            For privacy questions or to exercise your rights, contact our Privacy Team at:
+          </p>
+          <div className="bg-gray-50 rounded-xl p-4 mt-2">
+            <p><strong>Causyn AI — Privacy Team</strong></p>
+            <p>Email: <a href={`mailto:${EMAIL}`} className="text-blue-600">{EMAIL}</a></p>
+            <p>Website: <a href={WEBSITE} className="text-blue-600">{WEBSITE}</a></p>
           </div>
-        </Section>
-
-        <Section title="13. Changes to This Policy">
-          <p>
-            We may update this Privacy Policy periodically. We will notify you
-            of material changes via email and by updating the "Last updated" date.
-            Continued use of the service after changes constitutes acceptance
-            of the updated policy.
-          </p>
-        </Section>
-
-        <Section title="14. Contact Us">
-          <p>
-            For privacy-related questions or to exercise your rights:{" "}
-            <a href={`mailto:${EMAIL}`} className="text-blue-600 hover:text-blue-800">
-              {EMAIL}
-            </a>
+          <p className="mt-3">
+            If you are in the EU and believe we have not handled your data correctly,
+            you have the right to lodge a complaint with your local data protection authority.
           </p>
         </Section>
       </div>
 
-      {/* Footer nav */}
-      <div className="mt-12 pt-6 border-t border-gray-100 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-4 text-sm text-gray-400">
-          <Link href="/terms" className="hover:text-gray-600">Terms of Service</Link>
-          <Link href="/"      className="hover:text-gray-600">← Back to App</Link>
-        </div>
-        <p className="text-xs text-gray-300">
-          © {new Date().getFullYear()} {COMPANY}
-        </p>
-      </div>
-    </div>
-  )
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="mb-8">
-      <h2 className="text-base font-bold text-gray-900 mb-3 pb-2 border-b border-gray-100">
-        {title}
-      </h2>
-      <div className="text-sm text-gray-600 leading-relaxed space-y-3">
-        {children}
+      {/* Footer links */}
+      <div className="mt-10 pt-6 border-t border-gray-100 flex items-center justify-between">
+        <Link href="/terms"   className="text-sm text-blue-600 hover:text-blue-800">Terms of Service →</Link>
+        <Link href="/"        className="text-sm text-gray-400 hover:text-gray-600">← Back to Dashboard</Link>
       </div>
     </div>
   )

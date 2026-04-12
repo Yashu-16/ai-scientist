@@ -55,7 +55,7 @@ export default function AdminLayout({
             </div>
             <div>
               <p className="text-xs font-bold text-white leading-none">Admin</p>
-              <p className="text-[10px] text-gray-500 mt-0.5">AI Scientist</p>
+              <p className="text-[10px] text-gray-500 mt-0.5">Causyn AI</p>
             </div>
           </div>
         </div>

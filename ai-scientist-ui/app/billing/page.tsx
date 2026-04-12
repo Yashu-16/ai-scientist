@@ -10,7 +10,7 @@ function BillingContent() {
   const params  = useSearchParams()
   const success = params.get("success")
 
-  const [data, setData]     = useState<any>(null)
+  const [data, setData]       = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -68,7 +68,7 @@ function BillingContent() {
             <p className="text-sm text-gray-500 mt-0.5">
               {currentPlan.price === 0
                 ? "Free forever"
-                : `₹${currentPlan.price.toLocaleString("en-IN")}/month`}
+                : `$${currentPlan.price}/month`}
             </p>
           </div>
           <span className={`text-sm font-bold px-4 py-2 rounded-xl ${
@@ -105,20 +105,24 @@ function BillingContent() {
           )}
         </div>
 
-        {/* Subscription details */}
+        {/* Subscription dates */}
         {data?.subscription && (
           <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-2 gap-3">
             <div>
               <p className="text-xs text-gray-400">Period start</p>
               <p className="text-sm font-medium text-gray-800">
-                {new Date(data.subscription.currentPeriodStart).toLocaleDateString("en-IN")}
+                {new Date(data.subscription.currentPeriodStart).toLocaleDateString("en-US", {
+                  day: "numeric", month: "long", year: "numeric"
+                })}
               </p>
             </div>
             <div>
               <p className="text-xs text-gray-400">Next renewal</p>
               <p className="text-sm font-medium text-gray-800">
                 {data.subscription.currentPeriodEnd
-                  ? new Date(data.subscription.currentPeriodEnd).toLocaleDateString("en-IN")
+                  ? new Date(data.subscription.currentPeriodEnd).toLocaleDateString("en-US", {
+                      day: "numeric", month: "long", year: "numeric"
+                    })
                   : "—"}
               </p>
             </div>
@@ -149,17 +153,19 @@ function BillingContent() {
                     {getPlan(p.plan as PlanId).name} Plan
                   </p>
                   <p className="text-xs text-gray-400 mt-0.5">
-                    {new Date(p.createdAt).toLocaleDateString("en-IN", {
-                      day:"numeric", month:"long", year:"numeric"
+                    {new Date(p.createdAt).toLocaleDateString("en-US", {
+                      day: "numeric", month: "long", year: "numeric"
                     })}
-                    {p.razorpayPaymentId && (
-                      <span className="ml-2 font-mono">{p.razorpayPaymentId.slice(0,16)}...</span>
+                    {(p.stripePaymentId || p.razorpayPaymentId) && (
+                      <span className="ml-2 font-mono">
+                        {(p.stripePaymentId || p.razorpayPaymentId).slice(0, 16)}...
+                      </span>
                     )}
                   </p>
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-bold text-gray-900">
-                    ₹{(p.amount / 100).toLocaleString("en-IN")}
+                    ${(p.amount / 100).toFixed(2)}
                   </p>
                   <span className="text-xs bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full font-medium">
                     Paid

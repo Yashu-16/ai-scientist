@@ -365,8 +365,8 @@ export default function OrgDashboard() {
                 <FlaskConical className="h-4 w-4 text-gray-400" />
                 Recent Analyses
               </h3>
-              <Link href="/hypotheses" className="text-xs text-blue-500 hover:text-blue-700">
-                View all →
+              <Link href="/history" className="text-xs text-blue-500 hover:text-blue-700">
+              View all →
               </Link>
             </div>
             <div className="divide-y divide-gray-50">

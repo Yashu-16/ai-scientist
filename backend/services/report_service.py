@@ -177,7 +177,7 @@ def build_cover(disease: str, now: str, ds: dict, ev: dict) -> list:
 
     # Cover table — dark background
     cover_content = [
-        [Paragraph("AI SCIENTIST", ParagraphStyle("BrandLg",
+        [Paragraph("CAUSYN AI", ParagraphStyle("BrandLg",
             fontSize=11, fontName="Helvetica-Bold",
             textColor=colors.HexColor("#60a5fa")))],
         [Paragraph("Drug Discovery Intelligence Report", st["cover_sub"])],
@@ -931,7 +931,7 @@ def generate_pdf_report(data: dict) -> bytes:
     story.append(spacer(6))
     story.append(divider(C_BORDER, 0.5, 0))
     story.append(Paragraph(
-        f"AI Scientist V6  |  Generated: {now}  |  "
+        f"Causyn AI V6  |  Generated: {now}  |  "
         f"Disease: {disease}  |  "
         f"Data: OpenTargets, AlphaFold EBI, FDA FAERS, ClinicalTrials.gov, PubMed  |  "
         f"For exploratory research only. Not for clinical use.",

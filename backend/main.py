@@ -1,5 +1,5 @@
 # backend/main.py
-# Purpose: FastAPI backend — exposes the full AI Scientist pipeline
+# Purpose: FastAPI backend — exposes the full Causyn AI pipeline
 # as clean REST API endpoints.
 #
 # Endpoints:
@@ -44,7 +44,7 @@ from fastapi.responses import Response
 # ── App Lifecycle ────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("\n🧬 AI Scientist API starting up...")
+    print("\n🧬 Causyn AI API starting up...")
     print("   Endpoints ready at http://localhost:8000")
     print("   API docs at     http://localhost:8000/docs\n")
 
@@ -69,12 +69,12 @@ async def lifespan(app: FastAPI):
 
     if hasattr(app.state,'scheduler') and app.state.scheduler:
         app.state.scheduler.shutdown()
-    print("\n🛑 AI Scientist API shutting down...")
+    print("\n🛑 Causyn AI API shutting down...")
 
 
 # ── FastAPI App ──────────────────────────────────────────────
 app = FastAPI(
-    title       = "AI Scientist — Hypothesis Generation API",
+    title       = "Causyn AI — Hypothesis Generation API",
     description = """
     Generate evidence-backed biomedical hypotheses by combining:
     - **Protein targets** from OpenTargets
@@ -113,7 +113,7 @@ def root():
     """Root endpoint — confirms API is running."""
     return {
         "status" : "running",
-        "name"   : "AI Scientist Hypothesis Generation API",
+        "name"   : "Causyn AI Hypothesis Generation API",
         "version": "1.0.0",
         "docs"   : "/docs"
     }
@@ -466,7 +466,7 @@ def generate_pdf_report_endpoint(request: AnalysisRequest):
 @app.post("/ask-question", tags=["Chat"])
 def ask_question(request: dict):
     """
-    AI Scientist Chat — Ask anything about a disease analysis.
+    Causyn AI Chat — Ask anything about a disease analysis.
 
     Input:
         question     : str  — The user's question
@@ -565,7 +565,7 @@ def ask_question(request: dict):
     context_str = "\n".join(context_parts) if context_parts else "No analysis context available."
 
     # ── System prompt ─────────────────────────────────────────
-    system_prompt = f"""You are AI Scientist, an expert biomedical research assistant specializing in drug discovery and translational medicine.
+    system_prompt = f"""You are Causyn AI, an expert biomedical research assistant specializing in drug discovery and translational medicine.
 
 You have access to a real analysis of {disease_name or 'a disease'} performed using OpenTargets, FDA FAERS, PubMed, and AlphaFold data.
 

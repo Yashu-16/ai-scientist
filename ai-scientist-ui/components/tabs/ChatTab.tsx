@@ -120,7 +120,7 @@ export function ChatTab({ data }: { data: AnalysisResult }) {
   return (
     <div className="flex flex-col h-[680px]">
       <div className="mb-3">
-        <h3 className="text-sm font-semibold text-gray-700">🤖 Ask Anything — AI Scientist Chat</h3>
+        <h3 className="text-sm font-semibold text-gray-700">🤖 Ask Anything — Causyn AI Chat</h3>
         <p className="text-xs text-gray-400 mt-0.5">
           Ask questions about the <strong>{data.disease_name}</strong> analysis. Chat history persists across tab switches.
         </p>
@@ -155,7 +155,7 @@ export function ChatTab({ data }: { data: AnalysisResult }) {
                 : "bg-white border border-gray-200 shadow-sm rounded-bl-sm"
             }`}>
               <p className={`text-[11px] font-semibold mb-1 ${msg.role === "user" ? "text-blue-200" : "text-emerald-600"}`}>
-                {msg.role === "user" ? "👤 You" : "🤖 AI Scientist"}
+                {msg.role === "user" ? "👤 You" : "🤖 Causyn AI"}
               </p>
               <p className={`text-sm leading-relaxed whitespace-pre-wrap ${msg.role === "user" ? "text-white" : "text-gray-800"}`}>
                 {msg.content}
@@ -180,7 +180,7 @@ export function ChatTab({ data }: { data: AnalysisResult }) {
                 <div className="w-2 h-2 rounded-full bg-blue-400 animate-bounce" style={{ animationDelay: "150ms" }} />
                 <div className="w-2 h-2 rounded-full bg-blue-400 animate-bounce" style={{ animationDelay: "300ms" }} />
               </div>
-              <span className="text-sm text-gray-400">AI Scientist is thinking...</span>
+              <span className="text-sm text-gray-400">Causyn AI is thinking...</span>
             </div>
           </div>
         )}

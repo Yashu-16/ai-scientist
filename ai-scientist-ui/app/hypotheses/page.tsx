@@ -3,7 +3,8 @@
 // This page renders ALL 10 tabs matching the Streamlit UI exactly.
 // Data persists via localStorage - switching tabs never loses state.
 
-import { useState } from "react"
+import { useState, useEffect, Suspense } from "react"
+import { useSearchParams } from "next/navigation"
 import { useAnalysis } from "../../lib/hooks"
 import { Card, Spinner, EmptyState, StatCard } from "../../components/ui"
 import { GoNoGoCard } from "../../components/ui/GoNoBadge"
@@ -34,9 +35,22 @@ const TABS = [
   { id:"repurpose",   label:"🔁 Repurpose" },
 ]
 
-export default function HypothesesPage() {
+// ── Inner page (uses useSearchParams — must be inside Suspense) ──
+function HypothesesPageInner() {
   const { data, hydrated } = useAnalysis()
-  const [activeTab, setActiveTab] = useState("hypotheses")
+  const searchParams       = useSearchParams()
+
+  const [activeTab, setActiveTab] = useState(
+    searchParams.get("tab") ?? "hypotheses"
+  )
+
+  // Sync tab when URL param changes (e.g. from notification link)
+  useEffect(() => {
+    const tab = searchParams.get("tab")
+    if (tab && TABS.find(t => t.id === tab)) {
+      setActiveTab(tab)
+    }
+  }, [searchParams])
 
   if (!hydrated) return (
     <div className="flex items-center justify-center min-h-[60vh]">
@@ -50,7 +64,10 @@ export default function HypothesesPage() {
       title="No analysis loaded"
       subtitle="Run an analysis first to see all 10 analysis tabs with full decision intelligence."
       action={
-        <Link href="/analysis" className="inline-flex items-center gap-2 bg-blue-600 text-white text-sm font-medium px-5 py-2.5 rounded-lg hover:bg-blue-700 transition-colors">
+        <Link
+          href="/analysis"
+          className="inline-flex items-center gap-2 bg-blue-600 text-white text-sm font-medium px-5 py-2.5 rounded-lg hover:bg-blue-700 transition-colors"
+        >
           <FlaskConical className="h-4 w-4" />
           Run Analysis
         </Link>
@@ -64,13 +81,17 @@ export default function HypothesesPage() {
 
   return (
     <div className="space-y-5">
+
       {/* Page header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-gray-900">{data.disease_name}</h1>
           <p className="text-sm text-gray-500 mt-0.5">V5 Decision & Risk Intelligence Platform</p>
         </div>
-        <Link href="/analysis" className="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1.5">
+        <Link
+          href="/analysis"
+          className="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1.5"
+        >
           <FlaskConical className="h-3 w-3" />
           New Analysis
         </Link>
@@ -78,15 +99,19 @@ export default function HypothesesPage() {
 
       {/* Metrics row */}
       <div className="grid grid-cols-4 gap-3">
-        <StatCard label="🧬 Proteins"   value={data.protein_targets?.length ?? 0} color="blue" />
-        <StatCard label="💊 Drugs"      value={data.drugs?.length ?? 0}           color="green" />
-        <StatCard label="📚 Papers"     value={data.papers?.length ?? 0}          />
+        <StatCard label="🧬 Proteins"   value={data.protein_targets?.length ?? 0} color="blue"   />
+        <StatCard label="💊 Drugs"      value={data.drugs?.length ?? 0}           color="green"  />
+        <StatCard label="📚 Papers"     value={data.papers?.length ?? 0}                         />
         <StatCard label="💡 Hypotheses" value={data.hypotheses?.length ?? 0}      color="purple" />
       </div>
 
       {/* Evidence banner */}
       {ev && (
-        <div className={`rounded-xl border px-5 py-3 flex items-center justify-between ${ev.evidence_color === "green" ? "bg-emerald-50 border-emerald-200" : ev.evidence_color === "red" ? "bg-red-50 border-red-200" : "bg-amber-50 border-amber-200"}`}>
+        <div className={`rounded-xl border px-5 py-3 flex items-center justify-between ${
+          ev.evidence_color === "green" ? "bg-emerald-50 border-emerald-200" :
+          ev.evidence_color === "red"   ? "bg-red-50 border-red-200" :
+                                          "bg-amber-50 border-amber-200"
+        }`}>
           <div>
             <p className="text-xs text-gray-500 uppercase tracking-wide">Evidence Strength</p>
             <div className="flex items-center gap-3 mt-0.5">
@@ -107,12 +132,18 @@ export default function HypothesesPage() {
 
       {/* Uncertainty banner */}
       {au && (
-        <div className={`rounded-xl border px-5 py-3 ${au.uncertainty_label === "Low" ? "bg-emerald-50 border-emerald-200" : au.uncertainty_label === "Medium" ? "bg-amber-50 border-amber-200" : "bg-red-50 border-red-200"}`}>
+        <div className={`rounded-xl border px-5 py-3 ${
+          au.uncertainty_label === "Low"    ? "bg-emerald-50 border-emerald-200" :
+          au.uncertainty_label === "Medium" ? "bg-amber-50 border-amber-200" :
+                                              "bg-red-50 border-red-200"
+        }`}>
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2">
               <span className="text-xs text-gray-500 uppercase tracking-wide">Analysis Reliability</span>
               <span className="font-bold text-gray-900">
-                {au.uncertainty_label === "Low" ? "✅" : au.uncertainty_label === "Medium" ? "⚠️" : au.uncertainty_label === "High" ? "🔶" : "❌"} {au.uncertainty_label} Uncertainty
+                {au.uncertainty_label === "Low"    ? "✅" :
+                 au.uncertainty_label === "Medium" ? "⚠️" :
+                 au.uncertainty_label === "High"   ? "🔶" : "❌"} {au.uncertainty_label} Uncertainty
               </span>
               <span className="text-sm text-gray-500">Score: {au.uncertainty_score?.toFixed(2)}/1.00</span>
             </div>
@@ -124,8 +155,11 @@ export default function HypothesesPage() {
             {au.high_fda_risk      && <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full ring-1 ring-red-200">⚠️ High FDA Risk</span>}
             {au.no_causal_evidence && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full ring-1 ring-amber-200">⚠️ No Causal Evidence</span>}
             {au.limited_drug_data  && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full ring-1 ring-amber-200">⚠️ Limited Drug Data</span>}
-            {!au.low_paper_count && !au.weak_protein_assoc && !au.high_fda_risk && !au.no_causal_evidence && !au.limited_drug_data && (
-              <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full ring-1 ring-emerald-200">✅ No critical uncertainty flags</span>
+            {!au.low_paper_count && !au.weak_protein_assoc && !au.high_fda_risk &&
+             !au.no_causal_evidence && !au.limited_drug_data && (
+              <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full ring-1 ring-emerald-200">
+                ✅ No critical uncertainty flags
+              </span>
             )}
           </div>
         </div>
@@ -136,7 +170,9 @@ export default function HypothesesPage() {
         <Card padding="md">
           <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">🎯 V4 Decision Intelligence</p>
           <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-4 mb-4">
-            <p className="text-xs text-blue-300 font-semibold uppercase tracking-wide mb-1">✅ Best Recommendation for {data.disease_name}</p>
+            <p className="text-xs text-blue-300 font-semibold uppercase tracking-wide mb-1">
+              ✅ Best Recommendation for {data.disease_name}
+            </p>
             <p className="text-white text-base font-medium">{ds.best_hypothesis}</p>
           </div>
 
@@ -151,14 +187,20 @@ export default function HypothesesPage() {
             </div>
             <div className="bg-gray-50 border border-gray-100 rounded-lg px-4 py-3 text-center">
               <p className="text-xs text-gray-400 font-medium mb-1">📊 Confidence</p>
-              <p className={`text-lg font-bold ${(ds.confidence_score ?? 0) >= 0.8 ? "text-emerald-700" : (ds.confidence_score ?? 0) >= 0.6 ? "text-amber-700" : "text-red-700"}`}>
+              <p className={`text-lg font-bold ${
+                (ds.confidence_score ?? 0) >= 0.8 ? "text-emerald-700" :
+                (ds.confidence_score ?? 0) >= 0.6 ? "text-amber-700"   : "text-red-700"
+              }`}>
                 {Math.round((ds.confidence_score ?? 0) * 100)}%
               </p>
               <p className="text-xs text-gray-400">{ds.confidence_label}</p>
             </div>
             <div className="bg-gray-50 border border-gray-100 rounded-lg px-4 py-3 text-center">
               <p className="text-xs text-gray-400 font-medium mb-1">⚠️ Risk Level</p>
-              <p className={`text-lg font-bold ${ds.risk_level === "High" ? "text-red-700" : ds.risk_level === "Medium" ? "text-amber-700" : "text-emerald-700"}`}>
+              <p className={`text-lg font-bold ${
+                ds.risk_level === "High"   ? "text-red-700"   :
+                ds.risk_level === "Medium" ? "text-amber-700" : "text-emerald-700"
+              }`}>
                 {ds.risk_level === "High" ? "🔴" : ds.risk_level === "Medium" ? "🟡" : "🟢"} {ds.risk_level}
               </p>
             </div>
@@ -238,9 +280,23 @@ export default function HypothesesPage() {
         <div className={activeTab === "chat" ? "" : "hidden"}>
           <ChatTab data={data} />
         </div>
-        {activeTab === "trends" && <TrendsTab />}
+        {activeTab === "trends"    && <TrendsTab />}
         {activeTab === "repurpose" && <RepurposeTab />}
       </div>
+
     </div>
+  )
+}
+
+// ── Default export wrapped in Suspense (required for useSearchParams) ──
+export default function HypothesesPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Spinner size="lg" />
+      </div>
+    }>
+      <HypothesesPageInner />
+    </Suspense>
   )
 }

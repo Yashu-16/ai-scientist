@@ -25,7 +25,7 @@ export async function GET() {
           },
           analyses: {
             orderBy: { createdAt: "desc" },
-            take: 5,
+            take: 50,
             select: {
               id: true, diseaseName: true, decision: true,
               confidence: true, createdAt: true,

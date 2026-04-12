@@ -1372,7 +1372,7 @@ def generate_hypotheses(
 if __name__ == "__main__":
     from backend.services.pipeline_service import run_data_pipeline
 
-    print("🧬 AI Scientist V5 — Mock Fallback Test")
+    print("🧬 Causyn AI V5 — Mock Fallback Test")
     print("=" * 55)
 
     # Test that mock uses real disease proteins

@@ -1,18 +1,17 @@
 // lib/plans.ts
-
 export type PlanId = "FREE" | "ACADEMIC" | "PRO" | "ENTERPRISE"
 
 export interface PlanConfig {
-  id:             PlanId
-  name:           string
-  price:          number      // monthly in ₹
-  priceInPaise:   number      // price × 100
-  analysesLimit:  number      // -1 = unlimited
-  memberLimit:    number
-  features:       string[]
-  cta:            string
-  highlighted:    boolean
-  badge?:         string
+  id:            PlanId
+  name:          string
+  price:         number      // monthly in USD
+  priceInCents:  number      // price × 100
+  analysesLimit: number      // -1 = unlimited
+  memberLimit:   number
+  features:      string[]
+  cta:           string
+  highlighted:   boolean
+  badge?:        string
 }
 
 export const PLANS: PlanConfig[] = [
@@ -20,7 +19,7 @@ export const PLANS: PlanConfig[] = [
     id:            "FREE",
     name:          "Free",
     price:         0,
-    priceInPaise:  0,
+    priceInCents:  0,
     analysesLimit: 3,
     memberLimit:   1,
     cta:           "Current Plan",
@@ -29,18 +28,19 @@ export const PLANS: PlanConfig[] = [
       "3 analyses per month",
       "All 10 analysis tabs",
       "PDF export",
-      "AI chat",
+      "AI chat assistant",
       "GO/NO-GO decision engine",
+      "ClinicalTrials.gov integration",
     ],
   },
   {
     id:            "ACADEMIC",
     name:          "Academic",
-    price:         999,
-    priceInPaise:  99900,
+    price:         25,
+    priceInCents:  1900,
     analysesLimit: 50,
     memberLimit:   3,
-    cta:           "Upgrade to Academic",
+    cta:           "Start Free Trial",
     highlighted:   false,
     badge:         "For researchers",
     features: [
@@ -49,33 +49,35 @@ export const PLANS: PlanConfig[] = [
       "Priority API access",
       "All Free features",
       "Email support",
+      "Research citation export",
     ],
   },
   {
     id:            "PRO",
     name:          "Professional",
-    price:         4999,
-    priceInPaise:  499900,
+    price:         99,
+    priceInCents:  9900,
     analysesLimit: -1,
     memberLimit:   10,
-    cta:           "Upgrade to Pro",
+    cta:           "Start Free Trial",
     highlighted:   true,
     badge:         "Most Popular",
     features: [
       "Unlimited analyses",
       "Up to 10 team members",
       "Drug repurposing mode",
-      "Trend detection",
+      "Trend detection engine",
       "Knowledge graph access",
       "Priority support",
-      "GST invoice",
+      "API access",
+      "Invoice & receipts",
     ],
   },
   {
     id:            "ENTERPRISE",
     name:          "Enterprise",
     price:         0,
-    priceInPaise:  0,
+    priceInCents:  0,
     analysesLimit: -1,
     memberLimit:   -1,
     cta:           "Contact Sales",
@@ -84,11 +86,12 @@ export const PLANS: PlanConfig[] = [
     features: [
       "Unlimited analyses",
       "Unlimited team members",
-      "Dedicated support",
+      "Dedicated account manager",
       "Custom integrations",
-      "On-premise option",
+      "On-premise deployment option",
       "SLA guarantee",
-      "Custom contract",
+      "Custom contract & invoicing",
+      "Training & onboarding",
     ],
   },
 ]

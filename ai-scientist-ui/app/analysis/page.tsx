@@ -44,6 +44,19 @@ function AnalysisForm() {
 
   async function handleSubmit(diseaseName: string) {
     if (!diseaseName.trim()) return
+
+    // ── Check plan limit BEFORE running analysis ──────────
+    try {
+      const limitCheck = await fetch("/api/analyses/check-limit")
+      const limitData  = await limitCheck.json()
+      if (limitData.limitReached) {
+        setError(`Analysis limit reached (${limitData.used}/${limitData.limit}). Please upgrade your plan.`)
+        return
+      }
+    } catch (e) {
+      // If check fails, allow the analysis to proceed
+    }
+
     setLoading(true)
     setError(null)
     setStageIdx(0)

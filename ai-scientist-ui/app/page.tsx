@@ -18,7 +18,7 @@ const FEATURES = [
   { icon: Shield,        title: "GO / NO-GO Decision Engine",  desc: "Quantified confidence scores with supporting and blocking factors. Know exactly why a hypothesis is recommended or rejected.",             color: "bg-emerald-50 text-emerald-600" },
   { icon: TrendingUp,    title: "Failure Prediction",          desc: "AI-powered failure risk scoring with historical context, predicted failure modes, and recommended safeguards before you invest.",          color: "bg-purple-50 text-purple-600" },
   { icon: RefreshCw,     title: "Drug Repurposing",            desc: "Find new disease indications for existing drugs. Mechanistic analysis with shared pathways and evidence levels.",                           color: "bg-amber-50 text-amber-600" },
-  { icon: MessageSquare, title: "AI Scientist Chat",           desc: "Ask anything about your analysis. Context-aware answers referencing actual scores, proteins, drugs, and evidence.",                       color: "bg-pink-50 text-pink-600" },
+  { icon: MessageSquare, title: "Causyn AI Chat",           desc: "Ask anything about your analysis. Context-aware answers referencing actual scores, proteins, drugs, and evidence.",                       color: "bg-pink-50 text-pink-600" },
   { icon: FileText,      title: "PDF Research Reports",        desc: "Professional 9-section reports with executive decision, evidence analysis, risk tables, and hypothesis comparison.",                       color: "bg-slate-50 text-slate-600" },
 ]
 
@@ -54,7 +54,7 @@ export default function LandingPage() {
               <Dna className="h-4 w-4 text-white" />
             </div>
             <div>
-              <p className="text-sm font-bold text-gray-900 leading-none">AI Scientist</p>
+              <p className="text-sm font-bold text-gray-900 leading-none">Causyn AI</p>
               <p className="text-[10px] text-gray-400">Drug Discovery</p>
             </div>
           </div>
@@ -165,7 +165,7 @@ export default function LandingPage() {
             <p className="text-xs font-bold text-blue-600 uppercase tracking-widest mb-2">Full feature set</p>
             <h2 className="text-3xl font-black text-gray-900">Not a wrapper. A platform.</h2>
             <p className="text-gray-500 mt-3 max-w-xl mx-auto text-sm leading-relaxed">
-              Unlike simple LLM wrappers, AI Scientist runs a real 9-stage scientific pipeline with 5 live APIs,
+              Unlike simple LLM wrappers, Causyn AI runs a real 9-stage scientific pipeline with 5 live APIs,
               quantified scoring, persistent knowledge graphs, and professional PDF export.
             </p>
           </div>
@@ -244,9 +244,9 @@ export default function LandingPage() {
           <p className="text-gray-500 text-sm mb-8">No credit card required for the free plan</p>
           <div className="grid grid-cols-3 gap-4 mb-8">
             {[
-              { plan:"Free",         price:"₹0",        analyses:"3 analyses/month",  cta:"Get Started",  highlight: false },
-              { plan:"Academic",     price:"₹999/mo",   analyses:"50 analyses/month", cta:"Start Trial",  highlight: true  },
-              { plan:"Professional", price:"₹4,999/mo", analyses:"Unlimited",         cta:"Start Trial",  highlight: false },
+              { plan:"Free",         price:"$0",    analyses:"3 analyses/month",  cta:"Get Started", highlight: false },
+              { plan:"Academic",     price:"$25/mo",analyses:"50 analyses/month", cta:"Start Trial", highlight: true  },
+              { plan:"Professional", price:"$99/mo",analyses:"Unlimited",         cta:"Start Trial", highlight: false },
             ].map(({ plan, price, analyses, cta, highlight }) => (
               <div key={plan} className={`bg-white rounded-2xl p-6 border ${highlight ? "border-blue-500 ring-2 ring-blue-100" : "border-gray-200"}`}>
                 <p className="text-sm font-bold text-gray-900 mb-1">{plan}</p>
@@ -308,7 +308,7 @@ export default function LandingPage() {
             <div className="h-6 w-6 rounded bg-blue-600 flex items-center justify-center">
               <Dna className="h-3 w-3 text-white" />
             </div>
-            <p className="text-sm font-semibold text-gray-400">AI Scientist</p>
+            <p className="text-sm font-semibold text-gray-400">Causyn AI</p>
           </div>
           <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
             <span>FastAPI + Next.js + GPT-4o-mini</span>

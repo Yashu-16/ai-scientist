@@ -14,10 +14,10 @@ export async function sendVerificationEmail(
     await resend.emails.send({
       from:    FROM,
       to:      email,
-      subject: "Verify your AI Scientist account",
+      subject: "Verify your Causyn AI account",
       html: `
         <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;">
-          <h2 style="color:#1e293b">Welcome to AI Scientist, ${name}!</h2>
+          <h2 style="color:#1e293b">Welcome to Causyn AI, ${name}!</h2>
           <p style="color:#475569;line-height:1.6">
             You're one step away from unlocking AI-powered drug discovery.
             Click the button below to verify your email address.
@@ -31,7 +31,7 @@ export async function sendVerificationEmail(
           </p>
           <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0"/>
           <p style="color:#94a3b8;font-size:12px;">
-            AI Scientist · For exploratory research only · Not for clinical use
+            Causyn AI · For exploratory research only · Not for clinical use
           </p>
         </div>
       `
@@ -50,7 +50,7 @@ export async function sendPasswordResetEmail(
     await resend.emails.send({
       from:    FROM,
       to:      email,
-      subject: "Reset your AI Scientist password",
+      subject: "Reset your Causyn AI password",
       html: `
         <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;">
           <h2 style="color:#1e293b">Password Reset</h2>
@@ -85,13 +85,13 @@ export async function sendOrgInviteEmail(
     await resend.emails.send({
       from:    FROM,
       to:      email,
-      subject: `You've been invited to join ${orgName} on AI Scientist`,
+      subject: `You've been invited to join ${orgName} on Causyn AI`,
       html: `
         <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;">
           <h2 style="color:#1e293b">You're invited!</h2>
           <p style="color:#475569;line-height:1.6">
             <strong>${inviterName}</strong> has invited you to join
-            <strong>${orgName}</strong> on AI Scientist as a <strong>${role}</strong>.
+            <strong>${orgName}</strong> on Causyn AI as a <strong>${role}</strong>.
           </p>
           <a href="${url}" style="display:inline-block;margin:24px 0;padding:12px 28px;
             background:#2563eb;color:white;text-decoration:none;border-radius:8px;font-weight:600;">
