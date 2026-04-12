@@ -1,581 +1,941 @@
 # backend/services/report_service.py
-# V5 Feature 1: PDF Research Report Export
-# Generates a professional PDF from pipeline + hypothesis results
-# Uses ReportLab — lightweight, no external dependencies
+# V6 — Professional PDF redesign
+# Clean layout, proper alignment, enterprise-grade styling
 
 import io
 from datetime import datetime
-from typing import Optional
-
 from reportlab.lib.pagesizes import A4
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.lib import colors
 from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table,
-    TableStyle, HRFlowable, KeepTogether
+    TableStyle, HRFlowable, PageBreak, KeepTogether
 )
-from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
+from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT, TA_JUSTIFY
+from reportlab.platypus.flowables import Flowable
 
 
 # ── Color Palette ─────────────────────────────────────────────
-DARK_BG    = colors.HexColor("#0f172a")
-BLUE       = colors.HexColor("#3b82f6")
-PURPLE     = colors.HexColor("#8b5cf6")
-GREEN      = colors.HexColor("#22c55e")
-AMBER      = colors.HexColor("#f59e0b")
-RED        = colors.HexColor("#ef4444")
-LIGHT_GRAY = colors.HexColor("#94a3b8")
-SLATE      = colors.HexColor("#1e293b")
-WHITE      = colors.white
-TEXT_DARK  = colors.HexColor("#1e293b")
-TEXT_MID   = colors.HexColor("#475569")
+C_NAVY      = colors.HexColor("#0f172a")
+C_BLUE      = colors.HexColor("#2563eb")
+C_BLUE_LT   = colors.HexColor("#eff6ff")
+C_PURPLE    = colors.HexColor("#7c3aed")
+C_PURPLE_LT = colors.HexColor("#f5f3ff")
+C_GREEN     = colors.HexColor("#16a34a")
+C_GREEN_LT  = colors.HexColor("#f0fdf4")
+C_AMBER     = colors.HexColor("#d97706")
+C_AMBER_LT  = colors.HexColor("#fffbeb")
+C_RED       = colors.HexColor("#dc2626")
+C_RED_LT    = colors.HexColor("#fef2f2")
+C_GRAY      = colors.HexColor("#64748b")
+C_GRAY_LT   = colors.HexColor("#f8fafc")
+C_BORDER    = colors.HexColor("#e2e8f0")
+C_WHITE     = colors.white
+C_TEXT      = colors.HexColor("#1e293b")
+C_TEXT_MID  = colors.HexColor("#475569")
+C_TEXT_LIGHT= colors.HexColor("#94a3b8")
+
+PAGE_W = 170 * mm   # usable width (A4 - margins)
 
 
-def _build_styles() -> dict:
-    """Build all paragraph styles for the report."""
-    base = getSampleStyleSheet()
+# ── Styles ─────────────────────────────────────────────────────
+def S():
+    return {
+        "cover_title": ParagraphStyle("CoverTitle",
+            fontSize=32, fontName="Helvetica-Bold",
+            textColor=C_WHITE, alignment=TA_LEFT,
+            spaceAfter=4, leading=36),
 
-    styles = {
-        "title": ParagraphStyle(
-            "ReportTitle",
-            fontSize=26, fontName="Helvetica-Bold",
-            textColor=TEXT_DARK, spaceAfter=4,
-            alignment=TA_CENTER
-        ),
-        "subtitle": ParagraphStyle(
-            "ReportSubtitle",
-            fontSize=12, fontName="Helvetica",
-            textColor=LIGHT_GRAY, spaceAfter=2,
-            alignment=TA_CENTER
-        ),
-        "section": ParagraphStyle(
-            "SectionHeader",
-            fontSize=14, fontName="Helvetica-Bold",
-            textColor=BLUE, spaceBefore=14, spaceAfter=6,
-            borderPad=4
-        ),
-        "subsection": ParagraphStyle(
-            "SubsectionHeader",
-            fontSize=11, fontName="Helvetica-Bold",
-            textColor=TEXT_DARK, spaceBefore=8, spaceAfter=4
-        ),
-        "body": ParagraphStyle(
-            "BodyText",
-            fontSize=10, fontName="Helvetica",
-            textColor=TEXT_DARK, spaceAfter=4,
-            leading=15
-        ),
-        "body_sm": ParagraphStyle(
-            "BodySmall",
+        "cover_sub": ParagraphStyle("CoverSub",
+            fontSize=13, fontName="Helvetica",
+            textColor=colors.HexColor("#93c5fd"),
+            alignment=TA_LEFT, spaceAfter=2),
+
+        "cover_meta": ParagraphStyle("CoverMeta",
             fontSize=9, fontName="Helvetica",
-            textColor=TEXT_MID, spaceAfter=3,
-            leading=13
-        ),
-        "caption": ParagraphStyle(
-            "Caption",
-            fontSize=8, fontName="Helvetica-Oblique",
-            textColor=LIGHT_GRAY, spaceAfter=2
-        ),
-        "badge_go": ParagraphStyle(
-            "BadgeGO",
-            fontSize=11, fontName="Helvetica-Bold",
-            textColor=GREEN, spaceAfter=4
-        ),
-        "badge_nogo": ParagraphStyle(
-            "BadgeNoGO",
-            fontSize=11, fontName="Helvetica-Bold",
-            textColor=RED, spaceAfter=4
-        ),
-        "badge_invest": ParagraphStyle(
-            "BadgeInvest",
-            fontSize=11, fontName="Helvetica-Bold",
-            textColor=AMBER, spaceAfter=4
-        ),
-        "metric_label": ParagraphStyle(
-            "MetricLabel",
-            fontSize=8, fontName="Helvetica",
-            textColor=LIGHT_GRAY, alignment=TA_CENTER
-        ),
-        "metric_value": ParagraphStyle(
-            "MetricValue",
+            textColor=colors.HexColor("#cbd5e1"),
+            alignment=TA_LEFT),
+
+        "section_num": ParagraphStyle("SectionNum",
+            fontSize=9, fontName="Helvetica-Bold",
+            textColor=C_BLUE, spaceBefore=2),
+
+        "section_title": ParagraphStyle("SectionTitle",
             fontSize=16, fontName="Helvetica-Bold",
-            textColor=TEXT_DARK, alignment=TA_CENTER
-        ),
-        "bullet": ParagraphStyle(
-            "BulletText",
+            textColor=C_TEXT, spaceBefore=6, spaceAfter=4),
+
+        "subsection": ParagraphStyle("Subsection",
+            fontSize=11, fontName="Helvetica-Bold",
+            textColor=C_TEXT, spaceBefore=6, spaceAfter=3),
+
+        "body": ParagraphStyle("Body",
+            fontSize=10, fontName="Helvetica",
+            textColor=C_TEXT, spaceAfter=5,
+            leading=16, alignment=TA_JUSTIFY),
+
+        "body_sm": ParagraphStyle("BodySm",
             fontSize=9, fontName="Helvetica",
-            textColor=TEXT_DARK, spaceAfter=3,
-            leftIndent=12, leading=13
-        ),
-        "footer": ParagraphStyle(
-            "Footer",
-            fontSize=7, fontName="Helvetica",
-            textColor=LIGHT_GRAY, alignment=TA_CENTER
-        )
+            textColor=C_TEXT_MID, spaceAfter=4,
+            leading=14, alignment=TA_JUSTIFY),
+
+        "label": ParagraphStyle("Label",
+            fontSize=8, fontName="Helvetica-Bold",
+            textColor=C_TEXT_LIGHT, spaceAfter=1,
+            alignment=TA_CENTER),
+
+        "value": ParagraphStyle("Value",
+            fontSize=15, fontName="Helvetica-Bold",
+            textColor=C_TEXT, alignment=TA_CENTER),
+
+        "value_sm": ParagraphStyle("ValueSm",
+            fontSize=11, fontName="Helvetica-Bold",
+            textColor=C_TEXT, alignment=TA_CENTER),
+
+        "bullet": ParagraphStyle("Bullet",
+            fontSize=9.5, fontName="Helvetica",
+            textColor=C_TEXT, spaceAfter=3,
+            leftIndent=10, leading=14),
+
+        "caption": ParagraphStyle("Caption",
+            fontSize=8, fontName="Helvetica-Oblique",
+            textColor=C_TEXT_LIGHT, spaceAfter=2),
+
+        "footer": ParagraphStyle("Footer",
+            fontSize=7.5, fontName="Helvetica",
+            textColor=C_TEXT_LIGHT, alignment=TA_CENTER),
+
+        "tbl_header": ParagraphStyle("TblHeader",
+            fontSize=9, fontName="Helvetica-Bold",
+            textColor=C_WHITE),
+
+        "tbl_cell": ParagraphStyle("TblCell",
+            fontSize=9, fontName="Helvetica",
+            textColor=C_TEXT, leading=13),
+
+        "tbl_cell_sm": ParagraphStyle("TblCellSm",
+            fontSize=8, fontName="Helvetica",
+            textColor=C_TEXT_MID, leading=12),
+
+        "decision_go": ParagraphStyle("DecisionGO",
+            fontSize=22, fontName="Helvetica-Bold",
+            textColor=C_GREEN, alignment=TA_CENTER),
+
+        "decision_nogo": ParagraphStyle("DecisionNoGO",
+            fontSize=22, fontName="Helvetica-Bold",
+            textColor=C_RED, alignment=TA_CENTER),
+
+        "decision_inv": ParagraphStyle("DecisionInv",
+            fontSize=22, fontName="Helvetica-Bold",
+            textColor=C_AMBER, alignment=TA_CENTER),
     }
-    return styles
 
 
-def _divider(color=BLUE, thickness=0.5) -> HRFlowable:
-    return HRFlowable(
-        width="100%", thickness=thickness,
-        color=color, spaceAfter=4, spaceBefore=4
-    )
+# ── Helper Flowables ───────────────────────────────────────────
+def divider(color=C_BORDER, thickness=0.5, space=3):
+    return HRFlowable(width="100%", thickness=thickness,
+                      color=color, spaceBefore=space, spaceAfter=space)
 
 
-def _metric_table(metrics: list) -> Table:
-    """
-    Build a row of metric boxes.
-    metrics = [{"label": str, "value": str, "color": color}, ...]
-    """
-    styles = _build_styles()
-    headers = [Paragraph(m["label"], styles["metric_label"]) for m in metrics]
-    values  = [
-        Paragraph(
-            f'<font color="#{m.get("color_hex","1e293b")}">{m["value"]}</font>',
-            styles["metric_value"]
-        )
-        for m in metrics
+def spacer(h=4):
+    return Spacer(1, h * mm)
+
+
+def section_header(num: str, title: str, color=C_BLUE) -> list:
+    """Returns a styled section header block."""
+    st = S()
+    line = HRFlowable(width="100%", thickness=2, color=color,
+                      spaceBefore=0, spaceAfter=2)
+    return [
+        spacer(5),
+        Paragraph(num, st["section_num"]),
+        Paragraph(title, st["section_title"]),
+        line,
+        spacer(2),
     ]
 
-    data = [headers, values]
-    col_w = 170 / len(metrics) * mm
 
-    tbl = Table(data, colWidths=[col_w]*len(metrics))
+def kv_row(label: str, value: str, style_label, style_value) -> list:
+    """Label + value pair."""
+    return [Paragraph(label, style_label), Paragraph(value, style_value)]
+
+
+# ── Cover Page ─────────────────────────────────────────────────
+def build_cover(disease: str, now: str, ds: dict, ev: dict) -> list:
+    """Full-width dark cover page."""
+    story = []
+
+    # Dark header band via table
+    decision    = (ds.get("go_no_go") or {}).get("decision", "INVESTIGATE")
+    dec_color   = {"GO": "#22c55e", "NO-GO": "#ef4444", "INVESTIGATE": "#f59e0b"}.get(decision, "#f59e0b")
+    conf        = float(ds.get("confidence_score") or 0)
+    ev_label    = ev.get("evidence_label", "Unknown")
+    drug        = ds.get("recommended_drug", "-")
+    protein     = ds.get("target_protein", "-")
+
+    st = S()
+
+    # Cover table — dark background
+    cover_content = [
+        [Paragraph("AI SCIENTIST", ParagraphStyle("BrandLg",
+            fontSize=11, fontName="Helvetica-Bold",
+            textColor=colors.HexColor("#60a5fa")))],
+        [Paragraph("Drug Discovery Intelligence Report", st["cover_sub"])],
+        [Spacer(1, 6*mm)],
+        [Paragraph(disease, ParagraphStyle("DiseaseTitle",
+            fontSize=28, fontName="Helvetica-Bold",
+            textColor=C_WHITE, leading=32))],
+        [Spacer(1, 4*mm)],
+        [Paragraph(
+            f'Final Decision: <font color="{dec_color}"><b>{decision}</b></font>  |  '
+            f'Confidence: <b>{conf:.0%}</b>  |  Evidence: <b>{ev_label}</b>',
+            ParagraphStyle("DecLine", fontSize=11, fontName="Helvetica",
+                textColor=colors.HexColor("#cbd5e1"), leading=16))],
+        [Spacer(1, 3*mm)],
+        [Paragraph(
+            f'Drug: <b>{drug}</b>   |   Target: <b>{protein}</b>',
+            ParagraphStyle("DrugLine", fontSize=10, fontName="Helvetica",
+                textColor=colors.HexColor("#94a3b8")))],
+        [Spacer(1, 8*mm)],
+        [Paragraph(f'Generated: {now}', st["cover_meta"])],
+        [Paragraph(
+            'Powered by OpenTargets | AlphaFold | FDA FAERS | ClinicalTrials.gov | PubMed | GPT-4o-mini',
+            st["cover_meta"])],
+    ]
+
+    cover_tbl = Table([[row[0]] for row in cover_content], colWidths=[PAGE_W])
+    cover_tbl.setStyle(TableStyle([
+        ("BACKGROUND",    (0, 0), (-1, -1), C_NAVY),
+        ("TOPPADDING",    (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 10),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 10),
+        ("TOPPADDING",    (0, 0), (0, 0),   14),
+        ("BOTTOMPADDING", (0, -1),(0, -1),  14),
+    ]))
+
+    story.append(cover_tbl)
+    story.append(spacer(6))
+
+    # Disclaimer banner
+    disclaimer_tbl = Table(
+        [[Paragraph(
+            "FOR EXPLORATORY RESEARCH PURPOSES ONLY — NOT FOR CLINICAL USE. "
+            "AI-generated hypotheses are based on real scientific data but require experimental validation.",
+            ParagraphStyle("Disc", fontSize=8, fontName="Helvetica",
+                textColor=C_AMBER, alignment=TA_CENTER)
+        )]],
+        colWidths=[PAGE_W]
+    )
+    disclaimer_tbl.setStyle(TableStyle([
+        ("BACKGROUND",    (0,0), (-1,-1), C_AMBER_LT),
+        ("BOX",           (0,0), (-1,-1), 0.5, C_AMBER),
+        ("TOPPADDING",    (0,0), (-1,-1), 5),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 5),
+        ("LEFTPADDING",   (0,0), (-1,-1), 8),
+        ("RIGHTPADDING",  (0,0), (-1,-1), 8),
+    ]))
+    story.append(disclaimer_tbl)
+
+    return story
+
+
+# ── Metric Cards ───────────────────────────────────────────────
+def metric_cards(metrics: list) -> Table:
+    """
+    Render a row of metric cards.
+    metrics = [{"label": str, "value": str, "bg": color, "fg": color}]
+    """
+    st   = S()
+    n    = len(metrics)
+    w    = PAGE_W / n
+
+    headers = []
+    values  = []
+    for m in metrics:
+        headers.append(Paragraph(m["label"].upper(), ParagraphStyle("CardLabel",
+            fontSize=7.5, fontName="Helvetica-Bold",
+            textColor=m.get("fg", C_TEXT_LIGHT), alignment=TA_CENTER)))
+        values.append(Paragraph(str(m["value"]), ParagraphStyle("CardValue",
+            fontSize=m.get("size", 14), fontName="Helvetica-Bold",
+            textColor=m.get("fg", C_TEXT), alignment=TA_CENTER)))
+
+    tbl = Table([headers, values], colWidths=[w] * n)
     tbl.setStyle(TableStyle([
-        ("BACKGROUND", (0,0), (-1,-1), colors.HexColor("#f8fafc")),
-        ("BOX",        (0,0), (-1,-1), 0.5, colors.HexColor("#e2e8f0")),
-        ("INNERGRID",  (0,0), (-1,-1), 0.3, colors.HexColor("#e2e8f0")),
-        ("ALIGN",      (0,0), (-1,-1), "CENTER"),
-        ("VALIGN",     (0,0), (-1,-1), "MIDDLE"),
-        ("TOPPADDING", (0,0), (-1,-1), 6),
-        ("BOTTOMPADDING",(0,0),(-1,-1),6),
-        ("ROWBACKGROUNDS",(0,0),(-1,-1),[colors.HexColor("#f8fafc")]),
+        ("BACKGROUND",    (0, 0), (-1, -1), C_GRAY_LT),
+        ("TOPPADDING",    (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 4),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 4),
+        ("LINEABOVE",     (0, 0), (-1, 0),  2,   C_BLUE),
+        ("INNERGRID",     (0, 0), (-1, -1), 0.3, C_BORDER),
+        ("BOX",           (0, 0), (-1, -1), 0.5, C_BORDER),
+        ("ALIGN",         (0, 0), (-1, -1), "CENTER"),
+        ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+    ]))
+
+    # Apply individual background colors per column
+    for i, m in enumerate(metrics):
+        if "bg" in m:
+            tbl.setStyle(TableStyle([
+                ("BACKGROUND", (i, 0), (i, -1), m["bg"]),
+            ]))
+
+    return tbl
+
+
+# ── Info Box ──────────────────────────────────────────────────
+def info_box(content: str, bg=C_BLUE_LT, border=C_BLUE,
+             label: str = "") -> Table:
+    """Colored info/callout box."""
+    st    = S()
+    inner = Paragraph(f"<b>{label}</b> {content}" if label else content,
+                      ParagraphStyle("InfoBox", fontSize=9.5,
+                          fontName="Helvetica", textColor=C_TEXT,
+                          leading=15))
+    tbl = Table([[inner]], colWidths=[PAGE_W])
+    tbl.setStyle(TableStyle([
+        ("BACKGROUND",    (0,0), (-1,-1), bg),
+        ("LEFTPADDING",   (0,0), (-1,-1), 10),
+        ("RIGHTPADDING",  (0,0), (-1,-1), 10),
+        ("TOPPADDING",    (0,0), (-1,-1), 7),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 7),
+        ("LINEBEFORE",    (0,0), (0,-1),  3, border),
+        ("BOX",           (0,0), (-1,-1), 0.3, border),
     ]))
     return tbl
 
 
-def generate_pdf_report(data: dict) -> bytes:
-    """
-    Main function: generate a complete PDF report from analysis data.
+# ── Standard Table ─────────────────────────────────────────────
+def data_table(headers: list, rows: list, col_widths: list,
+               header_color=C_NAVY) -> Table:
+    """Build a clean data table."""
+    st = S()
 
-    Args:
-        data: The full analysis result dict from /analyze-disease
+    header_row = [Paragraph(h, st["tbl_header"]) for h in headers]
+    data_rows  = []
+    for row in rows:
+        data_rows.append([
+            Paragraph(str(cell), st["tbl_cell"]) for cell in row
+        ])
 
-    Returns:
-        PDF bytes ready for download
-    """
-    buf    = io.BytesIO()
-    doc    = SimpleDocTemplate(
-        buf,
-        pagesize    = A4,
-        leftMargin  = 20*mm,
-        rightMargin = 20*mm,
-        topMargin   = 18*mm,
-        bottomMargin= 18*mm
-    )
-    styles  = _build_styles()
-    story   = []
-    W       = 170*mm  # usable width
-
-    disease     = data.get("disease_name","Unknown Disease")
-    hypotheses  = data.get("hypotheses",[])
-    proteins    = data.get("protein_targets",[])
-    drugs       = data.get("drugs",[])
-    papers      = data.get("papers",[])
-    ds          = data.get("decision_summary") or {}
-    ev          = data.get("evidence_strength") or {}
-    au          = data.get("analysis_uncertainty") or {}
-    lr          = data.get("literature_review") or {}
-    best_hyp    = hypotheses[0] if hypotheses else {}
-
-    # ── COVER / HEADER ────────────────────────────────────────
-    story.append(Spacer(1, 8*mm))
-
-    # Title block — no emoji (ReportLab can't render them)
-    story.append(Paragraph("AI Scientist", styles["title"]))
-    story.append(Spacer(1, 2*mm))
-    story.append(Paragraph(
-        "Decision &amp; Risk Intelligence Platform for Drug Discovery",
-        styles["subtitle"]
-    ))
-    story.append(Spacer(1, 4*mm))
-    story.append(_divider(BLUE, 1.5))
-    story.append(Spacer(1, 3*mm))
-
-    # Report meta — plain text only
-    now = datetime.now().strftime("%B %d, %Y at %H:%M")
-    story.append(Paragraph(
-        f"Disease: {disease}     |     Generated: {now}     |     Powered by: GPT-4o-mini + OpenTargets + FDA FAERS",
-        styles["caption"]
-    ))
-    story.append(Spacer(1, 5*mm))
-
-    # ── SECTION 1: EXECUTIVE DECISION ────────────────────────
-    story.append(Paragraph("1. Executive Decision", styles["section"]))
-    story.append(_divider(BLUE))
-
-    # GO/NO-GO badge
-    gng = ds.get("go_no_go") or {}
-    decision   = gng.get("decision","INVESTIGATE")
-    dec_emoji  = {"GO":"✅","NO-GO":"❌","INVESTIGATE":"🔍"}.get(decision,"🔍")
-    dec_conf   = float(gng.get("confidence_in_decision") or 0)
-    dec_color  = {"GO":"22c55e","NO-GO":"ef4444","INVESTIGATE":"f59e0b"}.get(decision,"64748b")
-    dec_style  = {"GO": styles["badge_go"], "NO-GO": styles["badge_nogo"],
-                  "INVESTIGATE": styles["badge_invest"]}.get(decision, styles["badge_invest"])
-
-    story.append(Paragraph(
-        f"{dec_emoji} Final Decision: <b>{decision}</b> "
-        f"({dec_conf:.0%} decision confidence)",
-        dec_style
-    ))
-
-    # Key metrics table
-    conf  = float(ds.get("confidence_score") or 0)
-    risk  = ds.get("risk_level","Unknown")
-    drug  = ds.get("recommended_drug","—")
-    prot  = ds.get("target_protein","—")
-
-    risk_hex = {"High":"ef4444","Medium":"f59e0b","Low":"22c55e"}.get(risk,"64748b")
-    conf_hex = "22c55e" if conf >= 0.8 else "f59e0b" if conf >= 0.6 else "ef4444"
-
-    story.append(Spacer(1,3*mm))
-    story.append(_metric_table([
-        {"label":"Recommended Drug",  "value": drug,          "color_hex":"3b82f6"},
-        {"label":"Target Protein",    "value": prot,          "color_hex":"8b5cf6"},
-        {"label":"Confidence Score",  "value": f"{conf:.0%}", "color_hex":conf_hex},
-        {"label":"Risk Level",        "value": risk,          "color_hex":risk_hex},
+    tbl = Table([header_row] + data_rows, colWidths=col_widths)
+    tbl.setStyle(TableStyle([
+        ("BACKGROUND",     (0,0),  (-1,0),  header_color),
+        ("TEXTCOLOR",      (0,0),  (-1,0),  C_WHITE),
+        ("FONTNAME",       (0,0),  (-1,0),  "Helvetica-Bold"),
+        ("FONTSIZE",       (0,0),  (-1,-1), 9),
+        ("ALIGN",          (0,0),  (-1,-1), "LEFT"),
+        ("VALIGN",         (0,0),  (-1,-1), "MIDDLE"),
+        ("TOPPADDING",     (0,0),  (-1,-1), 6),
+        ("BOTTOMPADDING",  (0,0),  (-1,-1), 6),
+        ("LEFTPADDING",    (0,0),  (-1,-1), 6),
+        ("RIGHTPADDING",   (0,0),  (-1,-1), 6),
+        ("ROWBACKGROUNDS", (0,1),  (-1,-1),
+         [C_WHITE, colors.HexColor("#f8fafc")]),
+        ("GRID",           (0,0),  (-1,-1), 0.3, C_BORDER),
+        ("LINEBELOW",      (0,0),  (-1,0),  0.5, C_BORDER),
     ]))
-    story.append(Spacer(1,3*mm))
+    return tbl
 
-    # Primary reason
-    primary = str(gng.get("primary_reason") or ds.get("reasoning_summary",""))
+
+# ── Main PDF Generator ─────────────────────────────────────────
+def generate_pdf_report(data: dict) -> bytes:
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf, pagesize=A4,
+        leftMargin=20*mm, rightMargin=20*mm,
+        topMargin=16*mm, bottomMargin=16*mm
+    )
+
+    st        = S()
+    story     = []
+    now       = datetime.now().strftime("%B %d, %Y  %H:%M UTC")
+
+    disease   = data.get("disease_name", "Unknown Disease")
+    hyps      = data.get("hypotheses", [])
+    proteins  = data.get("protein_targets", [])
+    drugs     = data.get("drugs", [])
+    papers    = data.get("papers", [])
+    ds        = data.get("decision_summary") or {}
+    ev        = data.get("evidence_strength") or {}
+    au        = data.get("analysis_uncertainty") or {}
+    lr        = data.get("literature_review") or {}
+    best      = hyps[0] if hyps else {}
+
+    # ══════════════════════════════════════════════════════════
+    # COVER
+    # ══════════════════════════════════════════════════════════
+    story += build_cover(disease, now, ds, ev)
+
+    # ══════════════════════════════════════════════════════════
+    # SECTION 1 — EXECUTIVE DECISION
+    # ══════════════════════════════════════════════════════════
+    story += section_header("SECTION 01", "Executive Decision", C_BLUE)
+
+    gng       = ds.get("go_no_go") or {}
+    decision  = gng.get("decision", "INVESTIGATE")
+    dec_conf  = float(gng.get("confidence_in_decision") or 0)
+    conf      = float(ds.get("confidence_score") or 0)
+    risk      = ds.get("risk_level", "Unknown")
+    drug_name = ds.get("recommended_drug", "-")
+    prot_name = ds.get("target_protein", "-")
+    pathway   = ds.get("target_pathway", "-")
+
+    # Decision banner
+    dec_bg  = {"GO": C_GREEN_LT, "NO-GO": C_RED_LT, "INVESTIGATE": C_AMBER_LT}.get(decision, C_AMBER_LT)
+    dec_brd = {"GO": C_GREEN,    "NO-GO": C_RED,    "INVESTIGATE": C_AMBER}.get(decision, C_AMBER)
+    dec_txt = {"GO": "GO — Proceed to Validation",
+               "NO-GO": "NO-GO — Do Not Proceed",
+               "INVESTIGATE": "INVESTIGATE — Further Analysis Required"}.get(decision, decision)
+
+    decision_banner = Table(
+        [[Paragraph(dec_txt, ParagraphStyle("DecBanner",
+            fontSize=18, fontName="Helvetica-Bold",
+            textColor=dec_brd, alignment=TA_CENTER)),
+          Paragraph(f"{dec_conf:.0%}<br/><font size='8'>Decision Confidence</font>",
+            ParagraphStyle("DecConf",
+            fontSize=22, fontName="Helvetica-Bold",
+            textColor=dec_brd, alignment=TA_CENTER))]],
+        colWidths=[PAGE_W * 0.72, PAGE_W * 0.28]
+    )
+    decision_banner.setStyle(TableStyle([
+        ("BACKGROUND",    (0,0), (-1,-1), dec_bg),
+        ("BOX",           (0,0), (-1,-1), 1.5, dec_brd),
+        ("TOPPADDING",    (0,0), (-1,-1), 12),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 12),
+        ("LEFTPADDING",   (0,0), (-1,-1), 12),
+        ("RIGHTPADDING",  (0,0), (-1,-1), 12),
+        ("VALIGN",        (0,0), (-1,-1), "MIDDLE"),
+        ("LINEAFTER",     (0,0), (0,-1),  0.5, dec_brd),
+    ]))
+    story.append(decision_banner)
+    story.append(spacer(3))
+
+    # Key metrics
+    risk_fg = {"High": C_RED, "Medium": C_AMBER, "Low": C_GREEN}.get(risk, C_GRAY)
+    conf_fg = C_GREEN if conf >= 0.7 else C_AMBER if conf >= 0.5 else C_RED
+
+    story.append(metric_cards([
+        {"label": "Recommended Drug",  "value": drug_name, "fg": C_BLUE,   "size": 12},
+        {"label": "Target Protein",    "value": prot_name, "fg": C_PURPLE, "size": 12},
+        {"label": "Confidence Score",  "value": f"{conf:.0%}", "fg": conf_fg},
+        {"label": "Risk Level",        "value": risk,          "fg": risk_fg},
+    ]))
+    story.append(spacer(3))
+
+    # Reasoning
+    primary = str(gng.get("primary_reason") or ds.get("reasoning_summary", ""))
+    action  = str(ds.get("suggested_action") or gng.get("recommended_action", ""))
+    basis   = str(ds.get("evidence_basis", ""))
+
     if primary:
-        story.append(Paragraph(f"<b>Decision Basis:</b> {primary}", styles["body"]))
-
-    # Suggested action
-    action = str(ds.get("suggested_action") or gng.get("recommended_action",""))
+        story.append(info_box(primary, C_BLUE_LT, C_BLUE, "Decision Basis:"))
+        story.append(spacer(2))
     if action:
-        story.append(Paragraph(f"<b>Recommended Action:</b> {action}", styles["body"]))
+        story.append(info_box(action, C_GREEN_LT, C_GREEN, "Recommended Action:"))
+        story.append(spacer(2))
 
-    story.append(Spacer(1, 4*mm))
+    # Supporting vs blocking
+    supporting = gng.get("supporting_reasons") or []
+    blocking   = gng.get("blocking_reasons") or []
 
-    # ── SECTION 2: TOP HYPOTHESIS ─────────────────────────────
-    story.append(Paragraph("2. Top Hypothesis", styles["section"]))
-    story.append(_divider(PURPLE))
+    if supporting or blocking:
+        story.append(spacer(2))
+        cols = []
+        if supporting:
+            sup_content = [Paragraph("<b>Supporting Factors</b>",
+                ParagraphStyle("ColHead", fontSize=10,
+                    fontName="Helvetica-Bold", textColor=C_GREEN))]
+            for s in supporting[:4]:
+                sup_content.append(
+                    Paragraph(f"+ {s}", ParagraphStyle("SupItem",
+                        fontSize=8.5, fontName="Helvetica",
+                        textColor=C_TEXT, leading=13, spaceAfter=2)))
+            cols.append(sup_content)
 
-    if best_hyp:
-        title = str(best_hyp.get("title",""))
-        final = float(best_hyp.get("final_score") or 0)
-        expl  = str(best_hyp.get("explanation",""))
-        simple= str(best_hyp.get("simple_explanation",""))
+        if blocking:
+            blk_content = [Paragraph("<b>Blocking Factors</b>",
+                ParagraphStyle("ColHead2", fontSize=10,
+                    fontName="Helvetica-Bold", textColor=C_RED))]
+            for b in blocking[:4]:
+                blk_content.append(
+                    Paragraph(f"- {b}", ParagraphStyle("BlkItem",
+                        fontSize=8.5, fontName="Helvetica",
+                        textColor=C_TEXT, leading=13, spaceAfter=2)))
+            cols.append(blk_content)
 
-        story.append(Paragraph(f"<b>{title}</b>", styles["subsection"]))
-        story.append(Paragraph(
-            f"Composite Score: <b>{final:.0%}</b> &nbsp;|&nbsp; "
-            f"Proteins: <b>{', '.join(best_hyp.get('key_proteins',[]))}</b> &nbsp;|&nbsp; "
-            f"Drugs: <b>{', '.join(best_hyp.get('key_drugs',[]))}</b>",
-            styles["body_sm"]
-        ))
-        story.append(Spacer(1,2*mm))
-        story.append(Paragraph(f"<b>Scientific Explanation:</b>", styles["subsection"]))
-        story.append(Paragraph(expl, styles["body"]))
+        if len(cols) == 2:
+            max_rows = max(len(cols[0]), len(cols[1]))
+            while len(cols[0]) < max_rows: cols[0].append(Spacer(1,1))
+            while len(cols[1]) < max_rows: cols[1].append(Spacer(1,1))
+
+            factors_tbl = Table(
+                [[cols[0][i], cols[1][i]] for i in range(max_rows)],
+                colWidths=[PAGE_W/2 - 2*mm, PAGE_W/2 - 2*mm]
+            )
+            factors_tbl.setStyle(TableStyle([
+                ("BACKGROUND",  (0,0), (0,-1), C_GREEN_LT),
+                ("BACKGROUND",  (1,0), (1,-1), C_RED_LT),
+                ("TOPPADDING",  (0,0), (-1,-1), 4),
+                ("BOTTOMPADDING",(0,0),(-1,-1), 4),
+                ("LEFTPADDING", (0,0), (-1,-1), 8),
+                ("RIGHTPADDING",(0,0), (-1,-1), 8),
+                ("BOX",         (0,0), (0,-1),  0.5, C_GREEN),
+                ("BOX",         (1,0), (1,-1),  0.5, C_RED),
+                ("INNERGRID",   (0,0), (-1,-1), 0.2, C_BORDER),
+            ]))
+            story.append(factors_tbl)
+
+    # ══════════════════════════════════════════════════════════
+    # SECTION 2 — TOP HYPOTHESIS
+    # ══════════════════════════════════════════════════════════
+    story += section_header("SECTION 02", "Top Hypothesis", C_PURPLE)
+
+    if best:
+        title  = str(best.get("title", ""))
+        final  = float(best.get("final_score") or 0)
+        expl   = str(best.get("explanation", ""))
+        simple = str(best.get("simple_explanation", ""))
+        steps  = best.get("reasoning_steps") or []
+
+        # Hypothesis title card
+        hyp_title_tbl = Table(
+            [[Paragraph(title, ParagraphStyle("HypTitle",
+                fontSize=12, fontName="Helvetica-Bold",
+                textColor=C_TEXT, leading=17)),
+              Paragraph(f"{final:.0%}", ParagraphStyle("HypScore",
+                fontSize=20, fontName="Helvetica-Bold",
+                textColor=C_PURPLE, alignment=TA_CENTER))]],
+            colWidths=[PAGE_W * 0.8, PAGE_W * 0.2]
+        )
+        hyp_title_tbl.setStyle(TableStyle([
+            ("BACKGROUND",   (0,0), (-1,-1), C_PURPLE_LT),
+            ("BOX",          (0,0), (-1,-1), 1, C_PURPLE),
+            ("TOPPADDING",   (0,0), (-1,-1), 10),
+            ("BOTTOMPADDING",(0,0), (-1,-1), 10),
+            ("LEFTPADDING",  (0,0), (-1,-1), 10),
+            ("RIGHTPADDING", (0,0), (-1,-1), 10),
+            ("VALIGN",       (0,0), (-1,-1), "MIDDLE"),
+            ("LINEAFTER",    (0,0), (0,-1),  0.5, C_PURPLE),
+        ]))
+        story.append(hyp_title_tbl)
+        story.append(spacer(2))
+
+        # Key entities
+        prots = ", ".join(best.get("key_proteins", []))
+        drgs  = ", ".join(best.get("key_drugs", []))
+        story.append(metric_cards([
+            {"label": "Key Protein(s)", "value": prots or "-", "fg": C_BLUE,   "size": 11},
+            {"label": "Key Drug(s)",    "value": drgs  or "-", "fg": C_GREEN,  "size": 11},
+            {"label": "Composite Score","value": f"{final:.0%}","fg": C_PURPLE,"size": 14},
+        ]))
+        story.append(spacer(3))
+
+        if expl:
+            story.append(Paragraph("<b>Scientific Explanation</b>", st["subsection"]))
+            story.append(Paragraph(expl, st["body"]))
+            story.append(spacer(1))
 
         if simple:
-            story.append(Paragraph(f"<b>Simple Explanation:</b>", styles["subsection"]))
-            story.append(Paragraph(simple, styles["body"]))
+            story.append(info_box(simple, C_BLUE_LT, C_BLUE, "Plain Language:"))
+            story.append(spacer(2))
 
         # Reasoning steps
-        steps = best_hyp.get("reasoning_steps") or []
         if steps:
-            story.append(Paragraph("<b>Reasoning Chain:</b>", styles["subsection"]))
-            for step in steps:
-                story.append(Paragraph(f"• {step}", styles["bullet"]))
+            story.append(Paragraph("<b>Reasoning Chain</b>", st["subsection"]))
+            steps_data = [[
+                Paragraph(f"<b>{i+1}</b>", ParagraphStyle("StepNum",
+                    fontSize=11, fontName="Helvetica-Bold",
+                    textColor=C_WHITE, alignment=TA_CENTER)),
+                Paragraph(str(step), st["bullet"])
+            ] for i, step in enumerate(steps)]
 
-        # GO/NO-GO for this hypothesis
-        h_gng = best_hyp.get("go_no_go") or {}
-        h_dec = h_gng.get("decision","")
-        if h_dec:
-            story.append(Spacer(1,2*mm))
-            h_conf = float(h_gng.get("confidence_in_decision") or 0)
-            story.append(Paragraph(
-                f"<b>Hypothesis Decision:</b> {h_dec} ({h_conf:.0%} confident)",
-                styles["body"]
-            ))
+            steps_tbl = Table(steps_data,
+                colWidths=[8*mm, PAGE_W - 8*mm])
+            steps_tbl.setStyle(TableStyle([
+                ("BACKGROUND",    (0,0), (0,-1), C_BLUE),
+                ("BACKGROUND",    (1,0), (1,-1), C_GRAY_LT),
+                ("TOPPADDING",    (0,0), (-1,-1), 6),
+                ("BOTTOMPADDING", (0,0), (-1,-1), 6),
+                ("LEFTPADDING",   (0,0), (-1,-1), 6),
+                ("RIGHTPADDING",  (0,0), (-1,-1), 6),
+                ("VALIGN",        (0,0), (-1,-1), "TOP"),
+                ("INNERGRID",     (0,0), (-1,-1), 0.3, C_BORDER),
+                ("BOX",           (0,0), (-1,-1), 0.5, C_BORDER),
+            ]))
+            story.append(steps_tbl)
 
-    story.append(Spacer(1, 4*mm))
+    # ══════════════════════════════════════════════════════════
+    # SECTION 3 — EVIDENCE & PROTEINS
+    # ══════════════════════════════════════════════════════════
+    story += section_header("SECTION 03", "Evidence Analysis & Protein Targets", C_GREEN)
 
-    # ── SECTION 3: EVIDENCE ANALYSIS ─────────────────────────
-    story.append(Paragraph("3. Evidence Analysis", styles["section"]))
-    story.append(_divider(GREEN))
+    # Evidence + uncertainty side by side
+    ev_label  = str(ev.get("evidence_label", "Unknown"))
+    ev_score  = float(ev.get("evidence_score") or 0)
+    au_label  = str(au.get("uncertainty_label", "Unknown"))
+    au_score  = float(au.get("uncertainty_score") or 0)
+    au_reason = str(au.get("uncertainty_reason", ""))
 
-    # Evidence strength
-    ev_label = str(ev.get("evidence_label","Unknown"))
-    ev_score = float(ev.get("evidence_score") or 0)
-    ev_bd    = str(ev.get("evidence_breakdown",""))
-    story.append(Paragraph(
-        f"<b>Evidence Strength:</b> {ev_label} ({ev_score:.2f}/1.00)",
-        styles["body"]
-    ))
-    if ev_bd:
-        story.append(Paragraph(f"<i>{ev_bd}</i>", styles["caption"]))
-    story.append(Spacer(1,2*mm))
+    ev_fg  = C_GREEN if ev_label == "Strong" else C_AMBER if ev_label == "Moderate" else C_RED
+    au_fg  = C_RED   if "High" in au_label   else C_AMBER if au_label == "Medium"   else C_GREEN
 
-    # Uncertainty
-    au_label = str(au.get("uncertainty_label","Unknown"))
-    au_score = float(au.get("uncertainty_score") or 0)
-    au_reason= str(au.get("uncertainty_reason",""))
-    story.append(Paragraph(
-        f"<b>Analysis Uncertainty:</b> {au_label} ({au_score:.2f}/1.00)",
-        styles["body"]
-    ))
+    story.append(metric_cards([
+        {"label": "Evidence Strength", "value": ev_label,        "fg": ev_fg},
+        {"label": "Evidence Score",    "value": f"{ev_score:.2f}/1.00", "fg": ev_fg},
+        {"label": "Uncertainty",       "value": au_label,        "fg": au_fg},
+        {"label": "Uncertainty Score", "value": f"{au_score:.2f}/1.00", "fg": au_fg},
+    ]))
+    story.append(spacer(2))
+
     if au_reason:
-        story.append(Paragraph(au_reason, styles["body_sm"]))
-    story.append(Spacer(1,2*mm))
+        story.append(info_box(au_reason, C_GRAY_LT, C_GRAY))
+        story.append(spacer(2))
 
     # Protein targets table
     if proteins:
-        story.append(Paragraph("<b>Top Protein Targets:</b>", styles["subsection"]))
-        prot_data = [["Gene", "Protein Name", "Assoc. Score", "AlphaFold pLDDT"]]
-        for pt in proteins[:5]:
-            prot_data.append([
-                pt.get("gene_symbol",""),
-                pt.get("protein_name","")[:35],
-                f"{pt.get('association_score',0):.3f}",
-                f"{pt.get('alphafold_plddt',0):.2f}"
+        story.append(Paragraph("<b>Top Protein Targets</b>", st["subsection"]))
+        prot_rows = []
+        for p in proteins[:5]:
+            af = float(p.get("alphafold_plddt") or 0)
+            af_label = "V.High" if af >= 0.9 else "High" if af >= 0.7 else "Medium" if af >= 0.5 else "Low"
+            prot_rows.append([
+                p.get("gene_symbol", ""),
+                p.get("protein_name", "")[:40],
+                f"{p.get('association_score', 0):.3f}",
+                f"{af:.2f} ({af_label})",
+                p.get("alphafold_source", ""),
             ])
-        prot_tbl = Table(prot_data, colWidths=[25*mm, 70*mm, 35*mm, 40*mm])
-        prot_tbl.setStyle(TableStyle([
-            ("BACKGROUND",(0,0),(-1,0), SLATE),
-            ("TEXTCOLOR", (0,0),(-1,0), WHITE),
-            ("FONTNAME",  (0,0),(-1,0), "Helvetica-Bold"),
-            ("FONTSIZE",  (0,0),(-1,-1), 9),
-            ("ALIGN",     (0,0),(-1,-1), "LEFT"),
-            ("ALIGN",     (2,0),(-1,-1), "CENTER"),
-            ("ROWBACKGROUNDS",(0,1),(-1,-1),[colors.white, colors.HexColor("#f8fafc")]),
-            ("GRID",      (0,0),(-1,-1), 0.3, colors.HexColor("#e2e8f0")),
-            ("TOPPADDING",(0,0),(-1,-1),5),
-            ("BOTTOMPADDING",(0,0),(-1,-1),5),
-        ]))
-        story.append(prot_tbl)
+        story.append(data_table(
+            ["Gene Symbol", "Protein Name", "Assoc. Score", "AlphaFold pLDDT", "Source"],
+            prot_rows,
+            [22*mm, 65*mm, 25*mm, 35*mm, 23*mm],
+            header_color=C_NAVY
+        ))
 
-    story.append(Spacer(1, 4*mm))
-
-    # ── SECTION 4: RISK ANALYSIS ──────────────────────────────
-    story.append(Paragraph("4. Risk Analysis", styles["section"]))
-    story.append(_divider(AMBER))
-
-    if drugs:
-        drug_data = [["Drug", "Phase", "Target", "FDA Risk", "Competition"]]
-        for d in drugs:
-            comp = d.get("competition_intel") or {}
-            drug_data.append([
-                d.get("drug_name",""),
-                str(d.get("clinical_phase","N/A")),
-                d.get("target_gene",""),
-                d.get("risk_level","Unknown"),
-                comp.get("competition_level","Unknown")
-            ])
-        drug_tbl = Table(drug_data, colWidths=[40*mm, 18*mm, 25*mm, 25*mm, 62*mm])
-        drug_tbl.setStyle(TableStyle([
-            ("BACKGROUND",(0,0),(-1,0), colors.HexColor("#92400e")),
-            ("TEXTCOLOR", (0,0),(-1,0), WHITE),
-            ("FONTNAME",  (0,0),(-1,0), "Helvetica-Bold"),
-            ("FONTSIZE",  (0,0),(-1,-1), 9),
-            ("ALIGN",     (0,0),(-1,-1), "LEFT"),
-            ("ALIGN",     (1,0),(-1,-1), "CENTER"),
-            ("ROWBACKGROUNDS",(0,1),(-1,-1),[colors.white, colors.HexColor("#fffbeb")]),
-            ("GRID",      (0,0),(-1,-1), 0.3, colors.HexColor("#e2e8f0")),
-            ("TOPPADDING",(0,0),(-1,-1),5),
-            ("BOTTOMPADDING",(0,0),(-1,-1),5),
-        ]))
-        story.append(drug_tbl)
-
-    story.append(Spacer(1,3*mm))
-
-    # FDA adverse events for best drug
-    if drugs:
-        top_drug = drugs[0]
-        fda_aes  = top_drug.get("fda_adverse_events") or []
-        if fda_aes:
+    # Research papers
+    if papers:
+        story.append(spacer(3))
+        story.append(Paragraph("<b>Supporting Research Papers</b>", st["subsection"]))
+        for i, p in enumerate(papers[:5], 1):
             story.append(Paragraph(
-                f"<b>Top FDA Signals for {top_drug.get('drug_name','')}:</b>",
-                styles["subsection"]
-            ))
-            for ae in fda_aes[:3]:
-                story.append(Paragraph(
-                    f"• {ae.get('reaction','')}: {ae.get('count',0):,} reports",
-                    styles["bullet"]
-                ))
+                f"<b>{i}.</b> {p.get('title','')[:90]}",
+                st["body_sm"]))
+            story.append(Paragraph(
+                f"    {p.get('source','')} | {p.get('year','')} | "
+                f"{p.get('citation_count',0)} citations | "
+                f'<a href="{p.get("url","")}" color="#2563eb">View</a>',
+                st["caption"]))
 
-    story.append(Spacer(1, 4*mm))
+    # ══════════════════════════════════════════════════════════
+    # SECTION 4 — DRUG & RISK ANALYSIS
+    # ══════════════════════════════════════════════════════════
+    story += section_header("SECTION 04", "Drug & Risk Analysis", C_AMBER)
 
-    # ── SECTION 5: FAILURE PREDICTION ────────────────────────
-    story.append(Paragraph("5. Failure Prediction", styles["section"]))
-    story.append(_divider(RED))
+    if drugs:
+        drug_rows = []
+        for d in drugs:
+            comp     = d.get("competition_intel") or {}
+            fda_aes  = d.get("fda_adverse_events") or []
+            top_ae   = f"{fda_aes[0].get('reaction','')} ({fda_aes[0].get('count',0):,})" if fda_aes else "None"
+            drug_rows.append([
+                d.get("drug_name", ""),
+                str(d.get("clinical_phase", "N/A")),
+                d.get("target_gene", ""),
+                d.get("risk_level", "Unknown"),
+                comp.get("competition_level", "-"),
+                top_ae,
+            ])
 
-    if best_hyp:
-        fp = best_hyp.get("failure_prediction") or {}
+        story.append(data_table(
+            ["Drug Name", "Phase", "Target Gene", "FDA Risk", "Competition", "Top FDA Signal"],
+            drug_rows,
+            [35*mm, 14*mm, 22*mm, 20*mm, 24*mm, 55*mm],
+            header_color=colors.HexColor("#92400e")
+        ))
+        story.append(spacer(3))
+
+        # Drug details cards
+        for d in drugs[:3]:
+            comp    = d.get("competition_intel") or {}
+            fda_aes = d.get("fda_adverse_events") or []
+            trials  = d.get("clinical_trials") or []
+            mech    = str(d.get("mechanism", ""))[:120]
+            risk    = d.get("risk_level", "Unknown")
+            risk_bg = {"High": C_RED_LT, "Medium": C_AMBER_LT, "Low": C_GREEN_LT}.get(risk, C_GRAY_LT)
+            risk_bd = {"High": C_RED,    "Medium": C_AMBER,    "Low": C_GREEN}.get(risk, C_GRAY)
+
+            detail_content = []
+            detail_content.append(Paragraph(
+                f"<b>{d.get('drug_name','')}</b>  |  "
+                f"Phase {d.get('clinical_phase','?')}  |  "
+                f"Type: {d.get('drug_type','')}  |  "
+                f"Risk: <b>{risk}</b>",
+                ParagraphStyle("DrugCard", fontSize=10,
+                    fontName="Helvetica-Bold", textColor=C_TEXT)))
+
+            if mech:
+                detail_content.append(Paragraph(
+                    f"Mechanism: {mech}",
+                    ParagraphStyle("DrugMech", fontSize=8.5,
+                        fontName="Helvetica", textColor=C_TEXT_MID,
+                        leading=13, spaceBefore=3)))
+
+            if fda_aes:
+                ae_str = "  |  ".join([
+                    f"{ae.get('reaction','')} ({ae.get('count',0):,} reports)"
+                    for ae in fda_aes[:3]
+                ])
+                detail_content.append(Paragraph(
+                    f"FDA Adverse Events: {ae_str}",
+                    ParagraphStyle("DrugAE", fontSize=8.5,
+                        fontName="Helvetica", textColor=C_RED,
+                        leading=13, spaceBefore=2)))
+
+            if trials:
+                trial_str = "  |  ".join([
+                    f"{t.get('nct_id','')} ({t.get('status_label','?')})"
+                    for t in trials[:2]
+                ])
+                detail_content.append(Paragraph(
+                    f"Clinical Trials: {trial_str}",
+                    ParagraphStyle("DrugTrials", fontSize=8.5,
+                        fontName="Helvetica", textColor=C_BLUE,
+                        leading=13, spaceBefore=2)))
+
+            if comp:
+                detail_content.append(Paragraph(
+                    f"Competition: {comp.get('competition_level','?')} | "
+                    f"Market: {comp.get('market_opportunity','?')} | "
+                    f"{comp.get('strategic_note','')}",
+                    ParagraphStyle("DrugComp", fontSize=8.5,
+                        fontName="Helvetica", textColor=C_TEXT_MID,
+                        leading=13, spaceBefore=2)))
+
+            card_tbl = Table([[cell] for cell in detail_content],
+                colWidths=[PAGE_W])
+            card_tbl.setStyle(TableStyle([
+                ("BACKGROUND",    (0,0), (-1,-1), risk_bg),
+                ("TOPPADDING",    (0,0), (-1,-1), 4),
+                ("BOTTOMPADDING", (0,0), (-1,-1), 4),
+                ("LEFTPADDING",   (0,0), (-1,-1), 10),
+                ("RIGHTPADDING",  (0,0), (-1,-1), 10),
+                ("TOPPADDING",    (0,0), (0, 0),  8),
+                ("BOTTOMPADDING", (0,-1),(0,-1),  8),
+                ("LINEBEFORE",    (0,0), (0,-1),  3, risk_bd),
+                ("BOX",           (0,0), (-1,-1), 0.3, risk_bd),
+            ]))
+            story.append(card_tbl)
+            story.append(spacer(2))
+
+    # ══════════════════════════════════════════════════════════
+    # SECTION 5 — FAILURE PREDICTION
+    # ══════════════════════════════════════════════════════════
+    story += section_header("SECTION 05", "Failure Prediction & Risk Factors", C_RED)
+
+    if best:
+        fp = best.get("failure_prediction") or {}
         if fp:
-            fr_label  = str(fp.get("failure_risk_label","Unknown"))
+            fr_label  = str(fp.get("failure_risk_label", "Unknown"))
             fr_score  = float(fp.get("failure_risk_score") or 0)
             success_p = float(fp.get("success_probability") or 0)
-            top_fail  = str(fp.get("top_failure_reason",""))
-            hist_ctx  = str(fp.get("historical_context",""))
+            top_fail  = str(fp.get("top_failure_reason", ""))
+            hist_ctx  = str(fp.get("historical_context", ""))
 
-            story.append(_metric_table([
-                {"label":"Failure Risk",        "value":fr_label,          "color_hex":"ef4444"},
-                {"label":"Failure Risk Score",  "value":f"{fr_score:.0%}", "color_hex":"f97316"},
-                {"label":"Success Probability", "value":f"{success_p:.0%}","color_hex":"22c55e"},
+            fr_fg = C_RED if "High" in fr_label else C_AMBER if fr_label == "Medium" else C_GREEN
+
+            story.append(metric_cards([
+                {"label": "Failure Risk",         "value": fr_label,         "fg": fr_fg},
+                {"label": "Failure Risk Score",   "value": f"{fr_score:.0%}","fg": fr_fg},
+                {"label": "Success Probability",  "value": f"{success_p:.0%}","fg": C_GREEN},
             ]))
-            story.append(Spacer(1,2*mm))
+            story.append(spacer(3))
 
             if top_fail:
-                story.append(Paragraph(
-                    f"<b>Top Failure Mode:</b> {top_fail}", styles["body"]
-                ))
+                story.append(info_box(top_fail, C_RED_LT, C_RED, "Primary Failure Mode:"))
+                story.append(spacer(2))
+
             if hist_ctx:
-                story.append(Paragraph(
-                    f"<b>Historical Context:</b> {hist_ctx}", styles["body_sm"]
-                ))
+                story.append(info_box(hist_ctx, C_GRAY_LT, C_GRAY, "Historical Context:"))
+                story.append(spacer(2))
 
             reasons = fp.get("failure_reasons") or []
             if reasons:
-                story.append(Paragraph("<b>Predicted Failure Reasons:</b>", styles["subsection"]))
-                for r in reasons[:3]:
-                    story.append(Paragraph(
-                        f"• [{r.get('category','')}] {r.get('reason','')} "
-                        f"(Severity: {r.get('severity','')})",
-                        styles["bullet"]
-                    ))
-                    mit = r.get("mitigation","")
-                    if mit:
-                        story.append(Paragraph(f"  → Mitigation: {mit}", styles["caption"]))
+                story.append(Paragraph("<b>Predicted Failure Reasons</b>", st["subsection"]))
+                reason_rows = []
+                for r in reasons[:4]:
+                    reason_rows.append([
+                        r.get("category", ""),
+                        r.get("severity", ""),
+                        r.get("reason", "")[:60],
+                        r.get("mitigation", "")[:50],
+                    ])
+                story.append(data_table(
+                    ["Category", "Severity", "Failure Reason", "Mitigation"],
+                    reason_rows,
+                    [25*mm, 20*mm, 65*mm, 60*mm],
+                    header_color=C_RED
+                ))
+                story.append(spacer(2))
 
             safeguards = fp.get("recommended_safeguards") or []
             if safeguards:
-                story.append(Paragraph("<b>Recommended Safeguards:</b>", styles["subsection"]))
-                for sg in safeguards[:3]:
-                    story.append(Paragraph(f"• {sg}", styles["bullet"]))
+                story.append(Paragraph("<b>Recommended Safeguards</b>", st["subsection"]))
+                for sg in safeguards[:4]:
+                    story.append(Paragraph(f"+ {sg}", st["bullet"]))
 
-    story.append(Spacer(1, 4*mm))
+    # ══════════════════════════════════════════════════════════
+    # SECTION 6 — TIME-TO-MARKET
+    # ══════════════════════════════════════════════════════════
+    story += section_header("SECTION 06", "Time-to-Market Estimate", C_PURPLE)
 
-    # ── SECTION 6: TIME-TO-IMPACT ─────────────────────────────
-    story.append(Paragraph("6. Time-to-Market Estimate", styles["section"]))
-    story.append(_divider(PURPLE))
-
-    if best_hyp:
-        tti = best_hyp.get("time_to_impact") or {}
+    if best:
+        tti = best.get("time_to_impact") or {}
         if tti:
-            story.append(_metric_table([
-                {"label":"Timeline",            "value":tti.get("years_range","?"),         "color_hex":"8b5cf6"},
-                {"label":"Track",               "value":tti.get("speed_category","?"),       "color_hex":"6366f1"},
-                {"label":"Current Stage",       "value":tti.get("current_stage","?")[:20],  "color_hex":"3b82f6"},
-                {"label":"Success Probability", "value":f"{float(tti.get('success_probability',0)):.0%}", "color_hex":"22c55e"},
+            sp    = float(tti.get("success_probability") or 0)
+            sp_fg = C_GREEN if sp >= 0.7 else C_AMBER if sp >= 0.4 else C_RED
+
+            story.append(metric_cards([
+                {"label": "Timeline",             "value": tti.get("years_range","?"),       "fg": C_PURPLE},
+                {"label": "Track",                "value": tti.get("speed_category","?"),     "fg": C_BLUE},
+                {"label": "Current Stage",        "value": tti.get("current_stage","?")[:22],"fg": C_GRAY},
+                {"label": "Success Probability",  "value": f"{sp:.0%}",                       "fg": sp_fg},
             ]))
-            story.append(Spacer(1,2*mm))
+            story.append(spacer(3))
 
-            timeline = tti.get("timeline_breakdown") or []
-            if timeline:
-                story.append(Paragraph("<b>Timeline Breakdown:</b>", styles["subsection"]))
-                for i, step in enumerate(timeline, 1):
-                    story.append(Paragraph(f"{i}. {step}", styles["bullet"]))
-
+            timeline    = tti.get("timeline_breakdown") or []
             bottlenecks = tti.get("key_bottlenecks") or []
+
+            if timeline:
+                story.append(Paragraph("<b>Timeline Breakdown</b>", st["subsection"]))
+                tl_data = [[
+                    Paragraph(f"<b>{i+1}</b>", ParagraphStyle("TLNum",
+                        fontSize=10, fontName="Helvetica-Bold",
+                        textColor=C_WHITE, alignment=TA_CENTER)),
+                    Paragraph(step, st["bullet"])
+                ] for i, step in enumerate(timeline)]
+                tl_tbl = Table(tl_data, colWidths=[8*mm, PAGE_W - 8*mm])
+                tl_tbl.setStyle(TableStyle([
+                    ("BACKGROUND",    (0,0), (0,-1), C_PURPLE),
+                    ("BACKGROUND",    (1,0), (1,-1), C_PURPLE_LT),
+                    ("TOPPADDING",    (0,0), (-1,-1), 6),
+                    ("BOTTOMPADDING", (0,0), (-1,-1), 6),
+                    ("LEFTPADDING",   (0,0), (-1,-1), 6),
+                    ("RIGHTPADDING",  (0,0), (-1,-1), 6),
+                    ("VALIGN",        (0,0), (-1,-1), "TOP"),
+                    ("INNERGRID",     (0,0), (-1,-1), 0.3, C_BORDER),
+                    ("BOX",           (0,0), (-1,-1), 0.5, C_BORDER),
+                ]))
+                story.append(tl_tbl)
+                story.append(spacer(2))
+
             if bottlenecks:
-                story.append(Paragraph("<b>Key Bottlenecks:</b>", styles["subsection"]))
+                story.append(Paragraph("<b>Key Bottlenecks</b>", st["subsection"]))
                 for b in bottlenecks:
-                    story.append(Paragraph(f"• {b}", styles["bullet"]))
+                    story.append(Paragraph(f"- {b}", st["bullet"]))
 
-    story.append(Spacer(1, 4*mm))
+    # ══════════════════════════════════════════════════════════
+    # SECTION 7 — EXECUTIVE SUMMARY
+    # ══════════════════════════════════════════════════════════
+    story += section_header("SECTION 07", "Executive Summary", C_BLUE)
 
-    # ── SECTION 7: EXECUTIVE SUMMARY ─────────────────────────
-    story.append(Paragraph("7. Executive Summary", styles["section"]))
-    story.append(_divider(BLUE))
-
-    if best_hyp:
-        es = best_hyp.get("executive_summary") or {}
+    if best:
+        es = best.get("executive_summary") or {}
         if es:
-            headline = str(es.get("headline",""))
-            body     = str(es.get("body",""))
-            market   = str(es.get("market_opportunity",""))
-            bottom   = str(es.get("bottom_line",""))
+            headline = str(es.get("headline", ""))
+            body     = str(es.get("body", ""))
+            market   = str(es.get("market_opportunity", ""))
+            bottom   = str(es.get("bottom_line", ""))
 
             if headline:
-                story.append(Paragraph(f"<b>{headline}</b>", styles["subsection"]))
+                story.append(info_box(headline, C_NAVY,
+                    C_BLUE, ""))
+                story.append(spacer(2))
+
             if body:
-                story.append(Paragraph(body, styles["body"]))
-            if market:
-                story.append(Paragraph(f"<b>Market Opportunity:</b> {market}", styles["body_sm"]))
-            if bottom:
-                story.append(Paragraph(f"<b>Bottom Line:</b> {bottom}", styles["body"]))
+                story.append(Paragraph(body, st["body"]))
+                story.append(spacer(1))
 
-    story.append(Spacer(1, 4*mm))
+            if market or bottom:
+                mkt_data = []
+                if market:
+                    mkt_data.append(["Market Opportunity", market])
+                if bottom:
+                    mkt_data.append(["Bottom Line", bottom])
 
-    # ── SECTION 8: LITERATURE SUMMARY ────────────────────────
+                mkt_tbl = Table(mkt_data,
+                    colWidths=[38*mm, PAGE_W - 38*mm])
+                mkt_tbl.setStyle(TableStyle([
+                    ("BACKGROUND",    (0,0), (0,-1), C_NAVY),
+                    ("TEXTCOLOR",     (0,0), (0,-1), C_WHITE),
+                    ("FONTNAME",      (0,0), (0,-1), "Helvetica-Bold"),
+                    ("FONTSIZE",      (0,0), (-1,-1), 9),
+                    ("BACKGROUND",    (1,0), (1,-1), C_BLUE_LT),
+                    ("TOPPADDING",    (0,0), (-1,-1), 7),
+                    ("BOTTOMPADDING", (0,0), (-1,-1), 7),
+                    ("LEFTPADDING",   (0,0), (-1,-1), 8),
+                    ("RIGHTPADDING",  (0,0), (-1,-1), 8),
+                    ("GRID",          (0,0), (-1,-1), 0.3, C_BORDER),
+                    ("VALIGN",        (0,0), (-1,-1), "TOP"),
+                ]))
+                story.append(mkt_tbl)
+
+    # ══════════════════════════════════════════════════════════
+    # SECTION 8 — LITERATURE OVERVIEW
+    # ══════════════════════════════════════════════════════════
     if lr:
-        story.append(Paragraph("8. Literature Overview", styles["section"]))
-        story.append(_divider(GREEN))
+        story += section_header("SECTION 08", "Literature Overview", C_GREEN)
 
         lr_sections = [
-            ("Background",          "background"),
-            ("Current Research",    "current_research"),
-            ("Research Gaps",       "research_gaps"),
-            ("Risks & Limitations", "risks_limitations"),
-            ("Conclusion",          "conclusion"),
+            ("Background",          "background",       C_BLUE_LT,   C_BLUE),
+            ("Current Research",    "current_research", C_GREEN_LT,  C_GREEN),
+            ("Research Gaps",       "research_gaps",    C_AMBER_LT,  C_AMBER),
+            ("Risks & Limitations", "risks_limitations",C_RED_LT,    C_RED),
+            ("Conclusion",          "conclusion",       C_PURPLE_LT, C_PURPLE),
         ]
-        for title, key in lr_sections:
-            content = lr.get(key,"")
+        for title, key, bg, border in lr_sections:
+            content = lr.get(key, "")
             if content:
-                story.append(Paragraph(f"<b>{title}:</b>", styles["subsection"]))
-                story.append(Paragraph(content, styles["body_sm"]))
+                story.append(info_box(content, bg, border, f"{title}:"))
+                story.append(spacer(1))
 
-        story.append(Spacer(1, 4*mm))
+    # ══════════════════════════════════════════════════════════
+    # SECTION 9 — HYPOTHESIS COMPARISON
+    # ══════════════════════════════════════════════════════════
+    if len(hyps) > 1:
+        story += section_header("SECTION 09", "All Hypotheses Comparison", C_PURPLE)
 
-    # ── SECTION 9: ALL HYPOTHESES SUMMARY ────────────────────
-    if len(hypotheses) > 1:
-        story.append(Paragraph("9. Hypothesis Comparison", styles["section"]))
-        story.append(_divider(PURPLE))
-
-        hyp_data = [["Rank","Hypothesis","Score","Decision","Failure Risk"]]
-        medals   = {1:"#1",2:"#2",3:"#3"}
-        for h in hypotheses:
+        hyp_rows = []
+        for h in hyps:
             h_gng = h.get("go_no_go") or {}
             h_fp  = h.get("failure_prediction") or {}
-            hyp_data.append([
-                medals.get(h.get("rank",0), f"#{h.get('rank',0)}"),
-                str(h.get("title",""))[:55],
+            hyp_rows.append([
+                f"#{h.get('rank',0)}",
+                str(h.get("title",""))[:60],
                 f"{float(h.get('final_score',0)):.0%}",
-                h_gng.get("decision","—"),
-                h_fp.get("failure_risk_label","—")
+                h_gng.get("decision", "-"),
+                h_fp.get("failure_risk_label", "-"),
             ])
 
-        hyp_tbl = Table(hyp_data, colWidths=[12*mm, 85*mm, 18*mm, 30*mm, 25*mm])
-        hyp_tbl.setStyle(TableStyle([
-            ("BACKGROUND",(0,0),(-1,0), SLATE),
-            ("TEXTCOLOR", (0,0),(-1,0), WHITE),
-            ("FONTNAME",  (0,0),(-1,0), "Helvetica-Bold"),
-            ("FONTSIZE",  (0,0),(-1,-1), 9),
-            ("ALIGN",     (0,0),(-1,-1), "LEFT"),
-            ("ALIGN",     (0,0),(0,-1),  "CENTER"),
-            ("ALIGN",     (2,0),(-1,-1), "CENTER"),
-            ("ROWBACKGROUNDS",(0,1),(-1,-1),[colors.white, colors.HexColor("#f8fafc")]),
-            ("GRID",      (0,0),(-1,-1), 0.3, colors.HexColor("#e2e8f0")),
-            ("TOPPADDING",(0,0),(-1,-1),5),
-            ("BOTTOMPADDING",(0,0),(-1,-1),5),
-            ("WORDWRAP",  (1,0),(1,-1),  True),
-        ]))
-        story.append(hyp_tbl)
+        story.append(data_table(
+            ["Rank", "Hypothesis Title", "Score", "Decision", "Failure Risk"],
+            hyp_rows,
+            [12*mm, 90*mm, 16*mm, 28*mm, 24*mm],
+            header_color=C_NAVY
+        ))
 
-    # ── FOOTER ────────────────────────────────────────────────
-    story.append(Spacer(1, 8*mm))
-    story.append(_divider(LIGHT_GRAY, 0.5))
+    # ══════════════════════════════════════════════════════════
+    # FOOTER
+    # ══════════════════════════════════════════════════════════
+    story.append(spacer(6))
+    story.append(divider(C_BORDER, 0.5, 0))
     story.append(Paragraph(
-        f"Generated by AI Scientist V5 — {now} | "
-        f"For exploratory research only. Not for clinical use. | "
-        f"Powered by GPT-4o-mini, OpenTargets, FDA FAERS, PubMed",
-        styles["footer"]
+        f"AI Scientist V6  |  Generated: {now}  |  "
+        f"Disease: {disease}  |  "
+        f"Data: OpenTargets, AlphaFold EBI, FDA FAERS, ClinicalTrials.gov, PubMed  |  "
+        f"For exploratory research only. Not for clinical use.",
+        st["footer"]
     ))
 
     doc.build(story)
@@ -585,7 +945,7 @@ def generate_pdf_report(data: dict) -> bytes:
 
 # ── Quick test ────────────────────────────────────────────────
 if __name__ == "__main__":
-    print("Testing PDF Report Service...")
+    print("Testing PDF Report Service V6...")
 
     mock_data = {
         "disease_name": "Alzheimer disease",
@@ -594,86 +954,151 @@ if __name__ == "__main__":
             "title": "Lecanemab targets APP in the amyloidogenic pathway",
             "final_score": 0.80,
             "key_proteins": ["APP"],
-            "key_drugs":    ["Lecanemab"],
-            "explanation":  "Lecanemab inhibits Aβ aggregation by targeting APP cleavage products.",
-            "simple_explanation": "Lecanemab acts like a sponge, soaking up harmful proteins.",
+            "key_drugs": ["Lecanemab"],
+            "explanation": (
+                "Lecanemab inhibits amyloid-beta aggregation by targeting APP cleavage "
+                "products in the amyloidogenic pathway. The drug binds specifically to "
+                "protofibrils, the most toxic form of amyloid-beta, reducing plaque burden "
+                "and slowing neurodegeneration."
+            ),
+            "simple_explanation": (
+                "Think of amyloid plaques like rust building up in an engine. "
+                "Lecanemab acts like a rust remover, targeting the harmful protein "
+                "before it clumps together and damages brain cells."
+            ),
             "reasoning_steps": [
-                "Step 1 — APP produces amyloid-beta when cleaved.",
-                "Step 2 — Lecanemab binds to Aβ aggregates.",
-                "Step 3 — Reduces plaque burden in amyloidogenic pathway.",
-                "Step 4 — Clinical Phase 4 confirms therapeutic potential."
+                "Step 1 - Protein role: APP is cleaved to produce amyloid-beta, the primary toxic species in Alzheimer disease.",
+                "Step 2 - Drug mechanism: Lecanemab binds selectively to amyloid-beta protofibrils with high affinity.",
+                "Step 3 - Pathway interaction: Binding prevents aggregation in the amyloidogenic pathway, reducing plaque load.",
+                "Step 4 - Therapeutic logic: Phase 4 FDA approval confirms clinical efficacy with 27% slowing of decline."
             ],
             "go_no_go": {
-                "decision":"GO","confidence_in_decision":0.72,
-                "primary_reason":"Strong score exceeds GO threshold.",
-                "decision_color":"#22c55e","decision_emoji":"✅"
+                "decision": "GO",
+                "confidence_in_decision": 0.82,
+                "primary_reason": "Strong composite score (80%) exceeds GO threshold with Phase 4 approval and Low-Medium risk.",
+                "recommended_action": "Proceed to experimental validation targeting APP.",
+                "supporting_reasons": [
+                    "Score 80% exceeds GO threshold of 70%",
+                    "Phase 4 FDA approved drug - established safety profile",
+                    "Low-Medium FDA risk profile"
+                ],
+                "blocking_reasons": []
             },
             "failure_prediction": {
-                "failure_risk_label":"Medium","failure_risk_score":0.45,
-                "success_probability":0.65,
-                "top_failure_reason":"Amyloid clearance may not correlate with cognitive benefit.",
-                "historical_context":"Similar antibodies showed mixed Phase 3 results.",
-                "failure_reasons":[{
-                    "category":"Efficacy","severity":"High",
-                    "reason":"Biomarker benefit ≠ cognitive improvement",
-                    "mitigation":"Use cognitive endpoints alongside biomarkers"
-                }],
-                "recommended_safeguards":["Include MMSE cognitive endpoint","Adaptive trial design"]
+                "failure_risk_label": "Medium",
+                "failure_risk_score": 0.45,
+                "success_probability": 0.65,
+                "top_failure_reason": "Amyloid clearance may not fully translate to cognitive benefit.",
+                "historical_context": "Aducanumab showed amyloid reduction but controversial cognitive benefit; Lecanemab shows stronger evidence.",
+                "failure_reasons": [
+                    {"category": "Efficacy", "severity": "High",
+                     "reason": "Biomarker benefit may not equal cognitive improvement",
+                     "evidence": "Mixed results across amyloid-targeting trials",
+                     "mitigation": "Include MMSE and CDR cognitive endpoints alongside biomarkers"},
+                    {"category": "Safety", "severity": "Medium",
+                     "reason": "ARIA (brain swelling) in ~21% of patients",
+                     "evidence": "Phase 3 CLARITY AD trial data",
+                     "mitigation": "MRI monitoring protocol every 3 months"}
+                ],
+                "recommended_safeguards": [
+                    "Cognitive endpoint monitoring alongside biomarkers",
+                    "Regular MRI monitoring for ARIA",
+                    "Adaptive trial design with interim analysis"
+                ]
             },
             "time_to_impact": {
-                "years_range":"0–2 years","speed_category":"Fast",
-                "current_stage":"Phase 4 / FDA Approved",
-                "success_probability":0.80,
-                "timeline_breakdown":["Currently Phase 4","Label expansion 1-2yr"],
-                "key_bottlenecks":["Standard regulatory timeline"]
+                "years_range": "0-2 years",
+                "speed_category": "Fast",
+                "current_stage": "Phase 4 / FDA Approved",
+                "success_probability": 0.80,
+                "timeline_breakdown": [
+                    "Currently approved for early Alzheimer disease (FDA 2023)",
+                    "Label expansion studies ongoing: 1-2 years",
+                    "New indication approval possible: 2-4 years"
+                ],
+                "key_bottlenecks": [
+                    "Standard regulatory timeline for label expansion",
+                    "ARIA safety monitoring requirements"
+                ]
             },
             "executive_summary": {
-                "headline":"Lecanemab offers a promising Alzheimer's treatment",
-                "body":"Lecanemab is an FDA-approved amyloid-targeting therapy showing strong clinical evidence.",
-                "market_opportunity":"$15B+ Alzheimer's market with significant unmet need.",
-                "bottom_line":"Proceed with validation studies."
+                "headline": "Lecanemab represents the strongest near-term opportunity in Alzheimer drug development",
+                "body": (
+                    "Lecanemab (Leqembi) is FDA-approved for early Alzheimer disease and has demonstrated "
+                    "a 27% slowing of cognitive decline in Phase 3 trials. With APP as its target and a "
+                    "well-characterized mechanism of action, it represents the best-evidenced opportunity "
+                    "in this analysis. The drug's Phase 4 status means market entry is already achieved."
+                ),
+                "market_opportunity": "$15B+ Alzheimer's therapeutics market with 6.5M patients in the US alone. Lecanemab addresses early-stage disease with a differentiated mechanism.",
+                "bottom_line": "Recommend proceeding with validation studies for label expansion to moderate Alzheimer disease."
             }
         }],
         "protein_targets": [
-            {"gene_symbol":"APP","protein_name":"Amyloid Precursor Protein",
-             "association_score":0.87,"alphafold_plddt":0.85}
+            {"gene_symbol": "APP", "protein_name": "Amyloid Precursor Protein",
+             "association_score": 0.870, "alphafold_plddt": 0.67, "alphafold_source": "AlphaFold API"},
+            {"gene_symbol": "PSEN1", "protein_name": "Presenilin-1",
+             "association_score": 0.866, "alphafold_plddt": 0.72, "alphafold_source": "AlphaFold API"},
+            {"gene_symbol": "APOE", "protein_name": "Apolipoprotein E",
+             "association_score": 0.775, "alphafold_plddt": 0.76, "alphafold_source": "AlphaFold API"},
         ],
-        "drugs": [{
-            "drug_name":"Lecanemab","clinical_phase":4,"target_gene":"APP",
-            "risk_level":"Medium","competition_intel":{"competition_level":"High"},
-            "fda_adverse_events":[{"reaction":"ARIA","count":51}]
-        }],
-        "papers": [],
+        "drugs": [
+            {"drug_name": "Lecanemab", "clinical_phase": 4, "drug_type": "Antibody",
+             "target_gene": "APP", "mechanism": "Amyloid-beta protofibril inhibitor",
+             "risk_level": "Medium", "risk_description": "ARIA risk in ~21% of patients",
+             "competition_intel": {"competition_level": "High", "market_opportunity": "Crowded",
+                                   "strategic_note": "3 amyloid antibodies now approved",
+                                   "drug_class": "Amyloid-beta antibody"},
+             "fda_adverse_events": [
+                 {"reaction": "Amyloid Related Imaging Abnormality", "count": 1823},
+                 {"reaction": "Headache", "count": 942}
+             ],
+             "clinical_trials": [
+                 {"nct_id": "NCT03887455", "title": "CLARITY AD - Phase 3 Lecanemab Trial",
+                  "status": "COMPLETED", "status_label": "Completed", "phase": "Phase 3",
+                  "sponsor": "Eisai Inc", "start_date": "2019-03",
+                  "url": "https://clinicaltrials.gov/study/NCT03887455"},
+             ],
+             "trial_count": 1, "active_trial_count": 0, "completed_trial_count": 1},
+        ],
+        "papers": [
+            {"title": "Lecanemab in Early Alzheimer's Disease", "year": 2023,
+             "source": "PubMed", "citation_count": 892,
+             "url": "https://pubmed.ncbi.nlm.nih.gov/36449413/"},
+        ],
         "decision_summary": {
-            "recommended_drug":"Lecanemab","target_protein":"APP",
-            "confidence_score":0.80,"risk_level":"Medium",
-            "reasoning_summary":"Strong evidence profile supports this hypothesis.",
-            "suggested_action":"Proceed to validation studies.",
-            "go_no_go":{
-                "decision":"GO","confidence_in_decision":0.72,
-                "primary_reason":"Score exceeds GO threshold.",
-                "recommended_action":"Design in-vivo study."
+            "recommended_drug": "Lecanemab", "target_protein": "APP",
+            "target_pathway": "amyloidogenic pathway",
+            "confidence_score": 0.80, "risk_level": "Medium",
+            "reasoning_summary": "Lecanemab (Phase 4) targeting APP via the amyloidogenic pathway shows 80% composite score.",
+            "suggested_action": "Proceed with label expansion validation studies for moderate Alzheimer disease.",
+            "evidence_basis": "9 research papers | Evidence: Strong | Protein score: 0.87",
+            "go_no_go": {
+                "decision": "GO", "confidence_in_decision": 0.82,
+                "primary_reason": "Score exceeds GO threshold with FDA approval.",
+                "recommended_action": "Design in-vivo study targeting APP.",
+                "supporting_reasons": ["Score 80% exceeds threshold", "Phase 4 approved", "Moderate risk"],
+                "blocking_reasons": []
             }
         },
         "evidence_strength": {
-            "evidence_label":"Strong","evidence_score":0.65,
-            "evidence_breakdown":"9 papers, strong association"
+            "evidence_label": "Strong", "evidence_score": 0.72,
+            "evidence_breakdown": "9 papers | 3 highly cited | 4 recent | avg 287 citations"
         },
         "analysis_uncertainty": {
-            "uncertainty_label":"Low","uncertainty_score":0.20,
-            "uncertainty_reason":"Strong evidence base."
+            "uncertainty_label": "Low", "uncertainty_score": 0.20,
+            "uncertainty_reason": "Strong evidence base with established clinical data. Results are reliable for decision-making."
         },
         "literature_review": {
-            "background":"Alzheimer disease is a progressive neurodegenerative disorder.",
-            "current_research":"Amyloid-targeting therapies are the leading research direction.",
-            "research_gaps":"Causality between amyloid clearance and cognitive benefit unclear.",
-            "risks_limitations":"ARIA side effects and trial design challenges.",
-            "conclusion":"Lecanemab represents the strongest current candidate."
+            "background": "Alzheimer disease is a progressive neurodegenerative disorder affecting 50M people worldwide. Current approved therapies include cholinesterase inhibitors and the recently approved amyloid-targeting antibodies lecanemab and donanemab.",
+            "current_research": "The field has shifted toward amyloid-targeting immunotherapies following FDA approvals. LRRK2 inhibitors and tau-targeting approaches represent emerging directions. Combination therapies are gaining traction.",
+            "research_gaps": "The causal relationship between amyloid clearance and cognitive benefit remains debated. Biomarker development for patient stratification and identification of early intervention windows are critical unmet needs.",
+            "risks_limitations": "ARIA (amyloid-related imaging abnormalities) affects 21% of lecanemab patients. The long-term cognitive benefit profile requires further characterization. Access and cost remain significant barriers.",
+            "conclusion": "Based on current evidence, lecanemab targeting APP represents the strongest therapeutic opportunity in Alzheimer disease. Experimental validation of combination approaches and biomarker-guided patient selection are recommended next steps."
         }
     }
 
     pdf_bytes = generate_pdf_report(mock_data)
-    with open("test_report.pdf","wb") as f:
+    with open("test_report_v6.pdf", "wb") as f:
         f.write(pdf_bytes)
-    print(f"✅ PDF generated: test_report.pdf ({len(pdf_bytes):,} bytes)")
-    print("   Open with: Invoke-Item test_report.pdf")
+    print(f"PDF generated: test_report_v6.pdf ({len(pdf_bytes):,} bytes)")
+    print("Open with: Invoke-Item test_report_v6.pdf")

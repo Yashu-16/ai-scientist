@@ -639,6 +639,123 @@
       "mechanism": "DNA topoisomerase II inhibitor",
       "risk_level": "Medium",
       "appearances": 1
+    },
+    "ABCA12": {
+      "type": "protein",
+      "protein_name": "ATP binding cassette subfamily A member 12",
+      "diseases": [
+        "Harlequin Ichthyosis"
+      ],
+      "max_score": 0.7468,
+      "appearances": 1
+    },
+    "ST14": {
+      "type": "protein",
+      "protein_name": "ST14 transmembrane serine protease matriptase",
+      "diseases": [
+        "Harlequin Ichthyosis"
+      ],
+      "max_score": 0.0398,
+      "appearances": 1
+    },
+    "KLF4": {
+      "type": "protein",
+      "protein_name": "KLF transcription factor 4",
+      "diseases": [
+        "Harlequin Ichthyosis"
+      ],
+      "max_score": 0.034,
+      "appearances": 1
+    },
+    "KRT2": {
+      "type": "protein",
+      "protein_name": "keratin 2",
+      "diseases": [
+        "Harlequin Ichthyosis"
+      ],
+      "max_score": 0.0328,
+      "appearances": 1
+    },
+    "DSC1": {
+      "type": "protein",
+      "protein_name": "desmocollin 1",
+      "diseases": [
+        "Harlequin Ichthyosis"
+      ],
+      "max_score": 0.0326,
+      "appearances": 1
+    },
+    "CRBN": {
+      "type": "protein",
+      "protein_name": "cereblon",
+      "diseases": [
+        "POEMS Syndrome"
+      ],
+      "max_score": 0.1058,
+      "appearances": 1
+    },
+    "CUL4A": {
+      "type": "protein",
+      "protein_name": "cullin 4A",
+      "diseases": [
+        "POEMS Syndrome"
+      ],
+      "max_score": 0.1052,
+      "appearances": 1
+    },
+    "RBX1": {
+      "type": "protein",
+      "protein_name": "ring-box 1",
+      "diseases": [
+        "POEMS Syndrome"
+      ],
+      "max_score": 0.1052,
+      "appearances": 1
+    },
+    "NR3C1": {
+      "type": "protein",
+      "protein_name": "nuclear receptor subfamily 3 group C member 1",
+      "diseases": [
+        "POEMS Syndrome"
+      ],
+      "max_score": 0.1052,
+      "appearances": 1
+    },
+    "DDB1": {
+      "type": "protein",
+      "protein_name": "damage specific DNA binding protein 1",
+      "diseases": [
+        "POEMS Syndrome"
+      ],
+      "max_score": 0.1052,
+      "appearances": 1
+    },
+    "DEXAMETHASONE": {
+      "type": "drug",
+      "drug_name": "Dexamethasone",
+      "drug_type": "Small molecule",
+      "phase": 4,
+      "mechanism": "Glucocorticoid receptor agonist",
+      "risk_level": "High",
+      "appearances": 1
+    },
+    "LENALIDOMIDE": {
+      "type": "drug",
+      "drug_name": "Lenalidomide",
+      "drug_type": "Small molecule",
+      "phase": 4,
+      "mechanism": "CRL4(CRBN) E3 ubiquitin ligase modulator",
+      "risk_level": "High",
+      "appearances": 1
+    },
+    "DARATUMUMAB": {
+      "type": "drug",
+      "drug_name": "Daratumumab",
+      "drug_type": "Antibody",
+      "phase": 4,
+      "mechanism": "Lymphocyte differentiation antigen CD38 inhibitor",
+      "risk_level": "High",
+      "appearances": 1
     }
   },
   "edges": [
@@ -1153,6 +1270,54 @@
       "disease": "breast cancer",
       "score": 0.6972,
       "added_at": "2026-04-10T16:43:25.674736"
+    },
+    {
+      "from": "CERAMIDE",
+      "to": "ABCA12",
+      "relation": "hypothesis_link",
+      "disease": "Harlequin Ichthyosis",
+      "score": 0.4287,
+      "added_at": "2026-04-10T21:33:57.273287"
+    },
+    {
+      "from": "POTENTIAL INHIBITOR",
+      "to": "ST14",
+      "relation": "hypothesis_link",
+      "disease": "Harlequin Ichthyosis",
+      "score": 0.1459,
+      "added_at": "2026-04-10T21:33:57.273287"
+    },
+    {
+      "from": "DEXAMETHASONE",
+      "to": "NR3C1",
+      "relation": "targets",
+      "disease": "POEMS Syndrome",
+      "score": 0.5,
+      "added_at": "2026-04-10T21:36:08.596872"
+    },
+    {
+      "from": "LENALIDOMIDE",
+      "to": "CRBN",
+      "relation": "targets",
+      "disease": "POEMS Syndrome",
+      "score": 0.5,
+      "added_at": "2026-04-10T21:36:08.596872"
+    },
+    {
+      "from": "DARATUMUMAB",
+      "to": "CD38",
+      "relation": "targets",
+      "disease": "POEMS Syndrome",
+      "score": 0.5,
+      "added_at": "2026-04-10T21:36:08.596872"
+    },
+    {
+      "from": "INVESTIGATIONAL COMPOUND",
+      "to": "CUL4A",
+      "relation": "hypothesis_link",
+      "disease": "POEMS Syndrome",
+      "score": 0.0721,
+      "added_at": "2026-04-10T21:36:08.596872"
     }
   ],
   "disease_analyses": {
@@ -1211,14 +1376,28 @@
       "top_protein": "LRRK2",
       "confidence": 0.7921,
       "decision": "INVESTIGATE"
+    },
+    "Harlequin Ichthyosis": {
+      "last_analyzed": "2026-04-10T21:33:57.273287",
+      "top_drug": "Ceramide",
+      "top_protein": "ABCA12",
+      "confidence": 0.4287,
+      "decision": "NO-GO"
+    },
+    "POEMS Syndrome": {
+      "last_analyzed": "2026-04-10T21:36:08.596872",
+      "top_drug": "Lenalidomide",
+      "top_protein": "CRBN",
+      "confidence": 0.2423,
+      "decision": "NO-GO"
     }
   },
   "stats": {
-    "total_analyses": 26,
-    "total_proteins": 35,
-    "total_drugs": 36,
-    "total_edges": 64,
+    "total_analyses": 28,
+    "total_proteins": 45,
+    "total_drugs": 39,
+    "total_edges": 70,
     "created_at": "2026-04-04T09:37:36.259481",
-    "last_updated": "2026-04-10T19:47:16.240124"
+    "last_updated": "2026-04-10T21:36:08.596872"
   }
 }
