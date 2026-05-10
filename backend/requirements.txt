@@ -1,6 +1,10 @@
-
-rowan-python
+fastapi
+uvicorn
 httpx
+openai
+requests
+python-dotenv
+prisma
+bcryptjs
 rowan-python
 stjames
-httpx
