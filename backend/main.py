@@ -254,64 +254,85 @@ def get_trending_insights():
             detail=f"Trend analysis failed: {str(e)}"
         )
 
+# ── UPDATED /repurpose-drug endpoint ─────────────────────────────────────────
+# Replace the existing @app.post("/repurpose-drug") in main.py with this
+
 @app.post("/repurpose-drug", tags=["Drug Repurposing"])
-def repurpose_drug(request: dict):
+async def repurpose_drug(request: dict):
     """
     Drug Repurposing Mode — find new disease indications for an existing drug.
+    Phase 1: GPT-4o-mini candidates + Rowan molecular validation (ADMET, pKa, Solubility, Docking)
 
     Input:
-        drug_name    : str  — Name of the drug to repurpose
-        current_use  : str  — Optional known indication
+        drug_name    : str — Name of the drug to repurpose
+        current_use  : str — Optional known indication
+        run_rowan    : bool — Whether to run Rowan molecular validation (default: True)
 
     Returns:
-        repurposing_candidates: list of disease candidates with reasoning
+        repurposing_candidates: list with molecular validation scores
         mechanism_summary:      str
-        confidence:             str
+        molecular_validation:   dict from Rowan (ADMET, pKa, docking)
     """
     from backend.services.hypothesis_service import client, LLM_MODEL, LLM_PROVIDER
+    from backend.services.rowan_service import validate_drug_molecularly
+    import json, re
 
-    drug_name   = str(request.get("drug_name","")).strip()
-    current_use = str(request.get("current_use","")).strip()
+    drug_name   = str(request.get("drug_name", "")).strip()
+    current_use = str(request.get("current_use", "")).strip()
+    run_rowan   = bool(request.get("run_rowan", True))
 
     if not drug_name:
         raise HTTPException(status_code=422, detail="drug_name is required")
 
-    # ── Known drug mechanisms database (lightweight) ──────────
+    # ── Known drug mechanisms database ────────────────────────────────────────
     KNOWN_DRUGS = {
         "LECANEMAB": {
             "mechanism": "Anti-amyloid beta antibody — binds and clears Aβ aggregates",
             "primary":   "Alzheimer disease (Phase 4)",
-            "targets":   ["APP","amyloid-beta"]
+            "targets":   ["APP", "amyloid-beta"],
+            "pdb_ids":   []
         },
         "METFORMIN": {
             "mechanism": "AMPK activator — reduces hepatic glucose production",
             "primary":   "Type 2 diabetes",
-            "targets":   ["AMPK","mTOR","FOXO1"]
+            "targets":   ["AMPK", "mTOR", "FOXO1"],
+            "pdb_ids":   ["2YZJ"]  # AMPK structure
         },
         "NIROGACESTAT": {
             "mechanism": "Gamma-secretase inhibitor — blocks PSEN1/PSEN2 cleavage activity",
             "primary":   "Desmoid tumors (Phase 4)",
-            "targets":   ["PSEN1","PSEN2","Notch"]
-        },
-        "SEMAGACESTAT": {
-            "mechanism": "Gamma-secretase inhibitor — reduces Aβ production",
-            "primary":   "Alzheimer disease (discontinued)",
-            "targets":   ["PSEN1","gamma-secretase"]
+            "targets":   ["PSEN1", "PSEN2", "Notch"],
+            "pdb_ids":   []
         },
         "ADUCANUMAB": {
             "mechanism": "Anti-amyloid antibody targeting Aβ plaques",
             "primary":   "Alzheimer disease (FDA approved)",
-            "targets":   ["APP","amyloid-beta"]
+            "targets":   ["APP", "amyloid-beta"],
+            "pdb_ids":   []
         },
         "SILDENAFIL": {
             "mechanism": "PDE5 inhibitor — increases cGMP, causes vasodilation",
             "primary":   "Erectile dysfunction, Pulmonary hypertension",
-            "targets":   ["PDE5A","cGMP"]
+            "targets":   ["PDE5A", "cGMP"],
+            "pdb_ids":   ["1TBF"]  # PDE5 structure
         },
         "RAPAMYCIN": {
             "mechanism": "mTOR inhibitor — suppresses mTORC1 signaling",
             "primary":   "Organ transplant rejection",
-            "targets":   ["MTOR","FKBP12"]
+            "targets":   ["MTOR", "FKBP12"],
+            "pdb_ids":   ["1FAP"]  # FKBP12 structure
+        },
+        "IMATINIB": {
+            "mechanism": "BCR-ABL tyrosine kinase inhibitor",
+            "primary":   "Chronic myeloid leukemia",
+            "targets":   ["ABL1", "KIT", "PDGFRA"],
+            "pdb_ids":   ["1IEP"]  # ABL1 structure
+        },
+        "THALIDOMIDE": {
+            "mechanism": "CRBN E3 ligase modulator — degrades IKZF1/IKZF3",
+            "primary":   "Multiple myeloma",
+            "targets":   ["CRBN", "IKZF1", "IKZF3"],
+            "pdb_ids":   []
         },
     }
 
@@ -319,27 +340,30 @@ def repurpose_drug(request: dict):
     drug_info  = KNOWN_DRUGS.get(drug_upper, {
         "mechanism": f"Mechanism of {drug_name} (from general knowledge)",
         "primary":   current_use or "Unknown",
-        "targets":   []
+        "targets":   [],
+        "pdb_ids":   [],
     })
 
+    # ── Step 1: GPT-4o-mini repurposing candidates ─────────────────────────────
     if LLM_PROVIDER == "mock" or client is None:
-        return {
-            "success": True,
-            "drug_name": drug_name,
+        gpt_result = {
             "mechanism_summary": drug_info["mechanism"],
             "repurposing_candidates": [
                 {
-                    "disease":     "Parkinson disease",
-                    "rationale":   "Shared pathway with current indication",
-                    "confidence":  "Medium",
-                    "evidence":    "Preclinical models show promise",
-                    "next_step":   "Phase 2 trial design"
+                    "disease":        "Parkinson disease",
+                    "rationale":      "Shared pathway with current indication",
+                    "shared_pathway": "mTOR signaling",
+                    "confidence":     "Medium",
+                    "evidence_level": "Preclinical",
+                    "key_challenge":  "BBB penetration",
+                    "next_step":      "Phase 2 trial design"
                 }
             ],
-            "confidence": "Mock"
+            "overall_repurposing_potential": "Medium",
+            "repurposing_rationale": "Mock data — add OpenAI key for real analysis"
         }
-
-    prompt = f"""You are a drug repurposing expert with deep knowledge of disease mechanisms, drug targets, and clinical translation.
+    else:
+        prompt = f"""You are a drug repurposing expert with deep knowledge of disease mechanisms, drug targets, and clinical translation.
 
 DRUG TO REPURPOSE: {drug_name}
 PRIMARY INDICATION: {drug_info['primary']}
@@ -366,50 +390,144 @@ Return ONLY a JSON object:
       "confidence": "High / Medium / Low",
       "evidence_level": "Preclinical / Phase 1 / Phase 2 / Observational / Theoretical",
       "key_challenge": "Main obstacle to this repurposing",
-      "next_step": "Specific recommended next step (concrete experiment or trial)"
+      "next_step": "Specific recommended next step"
     }}
   ],
   "overall_repurposing_potential": "High / Medium / Low",
   "repurposing_rationale": "1-2 sentences on why this drug class is/isn't generally good for repurposing"
-}}
+}}"""
 
-Rank candidates by confidence (highest first). Return ONLY valid JSON.
-"""
+        try:
+            response = client.chat.completions.create(
+                model=LLM_MODEL,
+                temperature=0,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=1500,
+            )
+            raw = response.choices[0].message.content.strip()
+            raw = re.sub(r"^```json\s*", "", raw)
+            raw = re.sub(r"\s*```$", "", raw)
+            gpt_result = json.loads(raw)
+        except Exception as e:
+            print(f"⚠️  GPT repurposing error: {e}")
+            gpt_result = {
+                "mechanism_summary": drug_info["mechanism"],
+                "repurposing_candidates": [],
+                "overall_repurposing_potential": "Unknown",
+                "repurposing_rationale": "Analysis failed",
+            }
 
-    try:
-        response = client.chat.completions.create(
-            model   = LLM_MODEL,
-            messages= [
-                {"role": "system", "content": "Drug repurposing expert. Return only valid JSON."},
-                {"role": "user",   "content": prompt}
-            ],
-            temperature = 0.3,
-            max_tokens  = 1500,
+    # ── Step 2: Rowan molecular validation ────────────────────────────────────
+    molecular_validation = None
+    if run_rowan:
+        try:
+            molecular_validation = await validate_drug_molecularly(
+                drug_name      = drug_name,
+                target_proteins= drug_info.get("targets", []),
+                pdb_ids        = drug_info.get("pdb_ids", []),
+            )
+        except Exception as e:
+            print(f"⚠️  Rowan validation error: {e}")
+            molecular_validation = {
+                "available": False,
+                "error":     str(e),
+            }
+
+    # ── Step 3: Combine GPT + Rowan into enriched candidates ─────────────────
+    candidates = gpt_result.get("repurposing_candidates", [])
+
+    # Add molecular proof badges to each candidate
+    for candidate in candidates:
+        candidate["molecular_proof"] = _build_molecular_proof(
+            candidate, molecular_validation
         )
 
-        raw = response.choices[0].message.content.strip()
-        if raw.startswith("```"):
-            lines = raw.split("\n")
-            raw   = "\n".join(lines[1:-1])
+    return {
+        "success":                      True,
+        "drug_name":                    drug_name,
+        "mechanism_summary":            gpt_result.get("mechanism_summary", drug_info["mechanism"]),
+        "primary_indication":           drug_info["primary"],
+        "repurposing_candidates":       candidates,
+        "overall_potential":            gpt_result.get("overall_repurposing_potential", "Medium"),
+        "repurposing_rationale":        gpt_result.get("repurposing_rationale", ""),
+        "molecular_validation":         molecular_validation,
+        "rowan_powered":                molecular_validation is not None and molecular_validation.get("available", False),
+    }
 
-        result = json.loads(raw)
 
+def _build_molecular_proof(candidate: dict, mol_val: dict | None) -> dict:
+    """
+    Build molecular proof badges for a repurposing candidate
+    by combining GPT confidence with Rowan molecular data.
+    """
+    if not mol_val or not mol_val.get("available"):
         return {
-            "success":                   True,
-            "drug_name":                 drug_name,
-            "primary_indication":        drug_info["primary"],
-            "mechanism_summary":         result.get("mechanism_summary",""),
-            "repurposing_candidates":    result.get("repurposing_candidates",[]),
-            "overall_potential":         result.get("overall_repurposing_potential","Medium"),
-            "repurposing_rationale":     result.get("repurposing_rationale",""),
-            "confidence":                "AI-generated"
+            "status":  "pending",
+            "message": "Molecular validation not available",
+            "badges":  [],
         }
 
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Repurposing analysis failed: {str(e)}"
-        )
+    badges = []
+
+    # ADMET badges
+    admet = mol_val.get("admet") or {}
+    if admet:
+        bbb = str(admet.get("bbb_permeability", "")).lower()
+        if "high" in bbb or "yes" in bbb or "good" in bbb:
+            badges.append({"type": "success", "label": "BBB Permeable", "icon": "🧠"})
+        elif "low" in bbb or "no" in bbb:
+            badges.append({"type": "warning", "label": "Low BBB", "icon": "⚠️"})
+
+        herg = str(admet.get("herg_inhibition", "")).lower()
+        if "low" in herg or "no" in herg:
+            badges.append({"type": "success", "label": "Safe Cardiac Profile", "icon": "❤️"})
+        elif "high" in herg:
+            badges.append({"type": "danger", "label": "hERG Risk", "icon": "🚨"})
+
+        hepato = str(admet.get("hepatotoxicity", "")).lower()
+        if "low" in hepato or "no" in hepato:
+            badges.append({"type": "success", "label": "Low Hepatotoxicity", "icon": "✅"})
+
+    # Solubility badge
+    sol = mol_val.get("solubility") or {}
+    if sol:
+        sol_class = str(sol.get("solubility_class", "")).lower()
+        if "highly" in sol_class or "soluble" in sol_class:
+            badges.append({"type": "success", "label": f"Soluble (LogS {sol.get('log_s', '')})", "icon": "💧"})
+        elif "poorly" in sol_class:
+            badges.append({"type": "warning", "label": "Poor Solubility", "icon": "⚠️"})
+
+    # pKa badge
+    pka = mol_val.get("pka") or {}
+    if pka:
+        active = str(pka.get("active_at_physiological_ph", "")).lower()
+        if "yes" in active:
+            badges.append({"type": "success", "label": "Active at pH 7.4", "icon": "⚗️"})
+
+    # Docking badge
+    for dock in (mol_val.get("docking") or []):
+        affinity = dock.get("binding_affinity_kcal_mol")
+        if affinity and isinstance(affinity, (int, float)):
+            quality = dock.get("binding_quality", "")
+            icon    = "🎯" if affinity <= -7 else "🔶"
+            badges.append({
+                "type":  "success" if affinity <= -7 else "warning",
+                "label": f"{quality} ({affinity:.1f} kcal/mol) vs {dock.get('protein_name', '')}",
+                "icon":  icon,
+            })
+
+    # Overall molecular score
+    mol_score = mol_val.get("molecular_score", 0)
+    mol_grade = mol_val.get("molecular_grade", "")
+
+    return {
+        "status":         "validated",
+        "molecular_score": mol_score,
+        "molecular_grade": mol_grade,
+        "badges":          badges,
+        "smiles":          mol_val.get("smiles", ""),
+        "rowan_powered":   mol_val.get("rowan_powered", False),
+    }
 
 @app.post("/generate-pdf-report", tags=["Reports"])
 def generate_pdf_report_endpoint(request: AnalysisRequest):

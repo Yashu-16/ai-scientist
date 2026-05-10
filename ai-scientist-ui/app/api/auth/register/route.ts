@@ -27,39 +27,36 @@ export async function POST(req: Request) {
     const isDev = process.env.NODE_ENV === "development"
 
     // In dev: auto-verify. In prod: require email verification
-    const user = await prisma.user.create({
+    // Auto-verify users until custom domain is configured in Resend
+// Once causyn.ai domain is verified, re-enable email verification
+  const user = await prisma.user.create({
+    data: {
+      name,
+      email,
+      password: hashed,
+      emailVerified: new Date(), // auto-verify for now
+    }
+  })
+
+  // Try to send welcome email (non-blocking — won't fail registration if email fails)
+  try {
+    const token = crypto.randomBytes(32).toString("hex")
+    await prisma.verificationToken.create({
       data: {
-        name,
-        email,
-        password: hashed,
-        emailVerified: isDev ? new Date() : null, // ← auto-verify in dev
+        identifier: email,
+        token,
+        expires: new Date(Date.now() + 24 * 60 * 60 * 1000),
       }
     })
+    await sendVerificationEmail(email, name, token)
+  } catch (emailError) {
+    console.error("Welcome email failed (non-blocking):", emailError)
+  }
 
-    if (!isDev) {
-      // Only send verification email in production
-      const token = crypto.randomBytes(32).toString("hex")
-      await prisma.verificationToken.create({
-        data: {
-          identifier: email,
-          token,
-          expires: new Date(Date.now() + 24 * 60 * 60 * 1000),
-        }
-      })
-      await sendVerificationEmail(email, name, token)
-
-      return NextResponse.json({
-        success: true,
-        message: "Account created. Please check your email to verify."
-      })
-    }
-
-    // Dev mode: skip email, go straight to login
-    return NextResponse.json({
-      success: true,
-      message: "Account created. You can now sign in.",
-      devMode: true,
-    })
+  return NextResponse.json({
+    success: true,
+    message: "Account created. You can now sign in.",
+  })
 
   } catch (error) {
     console.error("Register error:", error)

@@ -33,13 +33,8 @@ if (!res.ok) {
   return
 }
 
-if (data.devMode) {
-  router.push("/auth/login?registered=1")
-  return
-}
-
-setSuccess(true)
-setLoading(false)
+// Always redirect to login — email auto-verified
+router.push("/auth/login?registered=1")
   }
 
   if (success) return (
