@@ -160,29 +160,42 @@ def _parse_admet(properties: dict) -> dict:
 # ── ADMET workflow ────────────────────────────────────────────────────────────
 def _run_admet_sync(rowan, smiles: str) -> Optional[dict]:
     try:
+        import time
         workflow = rowan.submit_admet_workflow(
             initial_smiles=smiles,
             name="causyn_admet",
         )
         print(f"  ADMET submitted: {workflow.uuid}")
 
-        # Poll until done
-        import time
-        for _ in range(40):  # max 200s
+        # Poll until done — use string comparison for status
+        DONE_STATUSES = {"completed_ok", "completed", "failed", "stopped", "error"}
+        for i in range(60):  # max 300s
             time.sleep(5)
-            workflow.fetch_latest()
-            if workflow.status.value in (2, 3, 4):  # completed/failed/stopped
+            try:
+                workflow.fetch_latest()
+            except Exception:
+                pass
+            status_str = str(workflow.status).lower()
+            print(f"  ADMET poll [{i*5}s]: {status_str}")
+            if any(s in status_str for s in DONE_STATUSES):
                 break
 
         # Get full data via retrieve
         full = rowan.retrieve_workflow(workflow.uuid)
+        print(f"  ADMET full data type: {type(full.data)}")
         if full.data and isinstance(full.data, dict):
             props = full.data.get("properties", {})
             if props:
                 print(f"  ✅ ADMET: {len(props)} properties retrieved")
                 return _parse_admet(props)
+            else:
+                print(f"  ⚠️ ADMET data keys: {list(full.data.keys())}")
+        else:
+            print(f"  ⚠️ ADMET full.data is None or not dict: {full.data}")
     except Exception as e:
+        import traceback
         print(f"⚠️  ADMET sync error: {e}")
+        print(traceback.format_exc())
     return None
 
 
@@ -210,15 +223,16 @@ def _run_pka_sync(rowan, smiles: str) -> Optional[dict]:
         print(f"  pKa submitted: {workflow.uuid}")
 
         import time
-        for _ in range(40):
+        DONE_STATUSES = {"completed_ok", "completed", "failed", "stopped", "error"}
+        for i in range(60):
             time.sleep(5)
-            workflow.fetch_latest()
-            if workflow.status.value in (2, 3, 4):
+            try:
+                workflow.fetch_latest()
+            except Exception:
+                pass
+            status_str = str(workflow.status).lower()
+            if any(s in status_str for s in DONE_STATUSES):
                 break
-
-        full = rowan.retrieve_workflow(workflow.uuid)
-        if full.data and isinstance(full.data, dict):
-            structures      = full.data.get("structures") or []
             conjugate_acids = full.data.get("conjugate_acids") or []
             conjugate_bases = full.data.get("conjugate_bases") or []
             pka_range       = full.data.get("pka_range", [2, 12])
