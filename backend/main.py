@@ -1471,3 +1471,28 @@ def kg_search(query: str):
         "query":   query,
         "results": knowledge_graph.search(query)
     }
+
+@app.get("/debug-rowan")
+def debug_rowan():
+    import sys
+    result = {"python": sys.version}
+    try:
+        import rowan
+        result["rowan_installed"] = True
+        result["rowan_version"] = getattr(rowan, "__version__", "unknown")
+    except ImportError as e:
+        result["rowan_installed"] = False
+        result["rowan_error"] = str(e)
+    try:
+        import stjames
+        result["stjames_installed"] = True
+    except ImportError as e:
+        result["stjames_installed"] = False
+        result["stjames_error"] = str(e)
+    try:
+        rowan_key = os.getenv("ROWAN_API_KEY", "")
+        result["rowan_key_set"] = bool(rowan_key)
+        result["rowan_key_prefix"] = rowan_key[:12] + "..." if rowan_key else "NOT SET"
+    except Exception as e:
+        result["key_error"] = str(e)
+    return result
