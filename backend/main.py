@@ -518,12 +518,29 @@ def _build_molecular_proof(candidate: dict, mol_val: dict | None) -> dict:
 
     # Overall molecular score
     mol_score = mol_val.get("molecular_score", 0)
-    mol_grade = mol_val.get("molecular_grade", "")
+
+    # Adjust score per candidate based on evidence level and confidence
+    evidence_bonus = {
+        "Phase 4": 10, "Phase 3": 8, "Phase 2": 5,
+        "Phase 1": 2,  "Observational": 0,
+        "Preclinical": -5, "Theoretical": -10,
+    }
+    confidence_bonus = {"High": 3, "Medium": 0, "Low": -5}
+
+    adjusted_score = mol_score
+    adjusted_score += evidence_bonus.get(candidate.get("evidence_level", ""), 0)
+    adjusted_score += confidence_bonus.get(candidate.get("confidence", ""), 0)
+    adjusted_score = max(0, min(100, adjusted_score))
+
+    if adjusted_score >= 75:   adj_grade = "A - Strong molecular candidate"
+    elif adjusted_score >= 60: adj_grade = "B - Promising candidate"
+    elif adjusted_score >= 45: adj_grade = "C - Moderate candidate"
+    else:                      adj_grade = "D - Weak molecular fit"
 
     return {
-        "status":         "validated",
-        "molecular_score": mol_score,
-        "molecular_grade": mol_grade,
+        "status":          "validated",
+        "molecular_score": adjusted_score,
+        "molecular_grade": adj_grade,
         "badges":          badges,
         "smiles":          mol_val.get("smiles", ""),
         "rowan_powered":   mol_val.get("rowan_powered", False),
